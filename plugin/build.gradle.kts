@@ -18,7 +18,6 @@ subprojects {
 
     configure<LibraryExtension> {
         namespace = "com.github.lampdelivery"
-
         compileSdk = 36
 
         defaultConfig {
@@ -72,3 +71,4 @@ subprojects {
     }
 
 }
+
