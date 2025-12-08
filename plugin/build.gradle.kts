@@ -67,8 +67,8 @@ subprojects {
         compileOnly(libs.aliucord)
         compileOnly(libs.kotlin.stdlib)
     }
-
 }
+
 
 
 
