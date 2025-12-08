@@ -46,7 +46,8 @@ jobs:
           
           rm -f $GITHUB_WORKSPACE/builds/*.zip
           find $GITHUB_WORKSPACE/src -name "*.zip" -path "*/build/outputs/*" -exec cp {} $GITHUB_WORKSPACE/builds/ \;
-          cp $GITHUB_WORKSPACE/src/build/outputs/updater.json $GITHUB_WORKSPACE/builds/
+          find $GITHUB_WORKSPACE/src $GITHUB_WORKSPACE -name "updater.json" -path "*/build/outputs/*" -exec cp {} $GITHUB_WORKSPACE/builds/ \; || true
+          ls -la $GITHUB_WORKSPACE/builds
 
       - name: Push builds branch
         run: |
