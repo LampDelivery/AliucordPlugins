@@ -38,7 +38,7 @@ subprojects {
     }
 
     configure<AliucordExtension> {
-        author("LampDelivery", 1242567443742986373L, hyperlink = true)
+        author("LampDelivery", 650805815623680030L, hyperlink = true)
 
         github("https://github.com/LampDelivery/AliucordPlugins")
     }
@@ -69,6 +69,7 @@ subprojects {
     }
 
 }
+
 
 
 
