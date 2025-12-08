@@ -13,13 +13,6 @@ import com.discord.stores.StoreChannels
 @AliucordPlugin(requiresRestart = false)
 class MessageLinkCompact : Plugin() {
 
-    init {
-        settingsTab = SettingsTab(
-            MessageLinkCompactSettings::class.java,
-            SettingsTab.Type.BOTTOM_SHEET
-        )
-    }
-
     override fun start(context: Context) {
         with(com.discord.api.message.Message::class.java) {
             patcher.patch(getDeclaredMethod("i"), Hook { callFrame ->
@@ -75,16 +68,5 @@ class MessageLinkCompact : Plugin() {
         } catch (_: Throwable) {
             null
         }
-    }
-}
-
-class MessageLinkCompactSettings : SettingsPage() {
-    override fun onViewCreated(view: View, savedInstanceState: android.os.Bundle?) {
-        super.onViewCreated(view, savedInstanceState)
-        linearLayout.addView(AppCompatTextView(requireContext()).apply {
-            text = "Message links will be shown as #channel-name > 💬"
-            textSize = 18f
-            setPadding(0, 16, 0, 16)
-        })
     }
 }
