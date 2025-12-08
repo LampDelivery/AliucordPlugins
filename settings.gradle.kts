@@ -2,10 +2,12 @@
 
 pluginManagement {
     repositories {
-        maven("https://maven.aliucord.com/releases")
-        gradlePluginPortal()
-        mavenCentral()
         google()
+        gradlePluginPortal()
+        maven {
+            name = "aliucord"
+            url = uri("https://maven.aliucord.com/releases")
+        }
     }
 }
 
@@ -26,10 +28,9 @@ dependencyResolutionManagement {
 }
 
 rootProject.name = "aliucord-plugins"
+include(":plugins")
 
-rootDir
-    .resolve("plugin")
-    .listFiles { file ->
-        file.isDirectory && file.resolve("build.gradle.kts").exists()
-    }!!
-    .forEach { include(":plugin:${it.name}") }
+// Add each directory under ./plugins as a separate project
+rootDir.resolve("plugins")
+    .listFiles { file -> file.isDirectory && file.resolve("build.gradle.kts").exists() }!!
+    .forEach { include(":plugins:${it.name}") }
