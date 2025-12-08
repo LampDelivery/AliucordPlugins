@@ -45,7 +45,7 @@ jobs:
           ./gradlew make :generateUpdaterJson
     
           rm -f $GITHUB_WORKSPACE/builds/*.zip
-          cp $GITHUB_WORKSPACE/src/plugin/*/build/outputs/*.zip $GITHUB_WORKSPACE/builds/
+          cp $GITHUB_WORKSPACE/src/plugins/*/build/outputs/*.zip $GITHUB_WORKSPACE/builds/
           cp $GITHUB_WORKSPACE/src/build/outputs/updater.json $GITHUB_WORKSPACE/builds/
 
       - name: Push builds branch
