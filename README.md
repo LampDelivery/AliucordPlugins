@@ -4,4 +4,5 @@ hi
 
 ## MessageLinkCompact
 
-Embeds message links in dms and servers like DiscordRN
+compacts message links in dms and servers like DiscordRN
+
