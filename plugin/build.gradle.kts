@@ -38,7 +38,6 @@ subprojects {
     }
 
     configure<AliucordExtension> {
-        // TODO: Change to your name and user ID
         author("LampDelivery", 1242567443742986373L, hyperlink = true)
 
         github("https://github.com/LampDelivery/AliucordPlugins")
@@ -71,4 +70,5 @@ subprojects {
     }
 
 }
+
 
