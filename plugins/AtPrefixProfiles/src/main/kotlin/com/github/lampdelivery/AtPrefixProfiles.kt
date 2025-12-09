@@ -17,8 +17,6 @@ class AtPrefixProfiles : Plugin() {
 
     override fun start(context: Context) {
         logger.info("AtPrefixProfiles start")
-        // No settings UI; apply changes directly including settings preview
-        // Candidate profile widgets across Discord versions
         val candidates = listOf(
             "com.discord.widgets.user.profile.UserProfileHeaderView",
             "com.discord.widgets.user.profile.WidgetUserProfile",
@@ -38,7 +36,6 @@ class AtPrefixProfiles : Plugin() {
                 patcher.patch(method, Hook { cf ->
                     try {
                         val root = cf.args?.getOrNull(0) as? View ?: return@Hook
-                        // Prefer specific ids if available; try multiple ids and package names
                         val idCandidates = listOf(
                             "user_profile_header_primary_name",
                             "user_profile_header_secondary_name",
@@ -87,7 +84,6 @@ class AtPrefixProfiles : Plugin() {
                 for (mName in methods) {
                     for (m in c.declaredMethods) {
                         if (m.name != mName) continue
-                        // Patch and after invocation, attempt to find & apply prefix
                         patcher.patch(m, Hook { cf ->
                             try {
                                 val owner = cf.thisObject
@@ -116,20 +112,17 @@ class AtPrefixProfiles : Plugin() {
             }
         }
 
-        // Settings page
         try {
             val appFragment = Class.forName("com.discord.app.AppFragment")
             for (m in appFragment.declaredMethods) {
                 if (m.name == "onViewCreated") {
                     patcher.patch(m, Hook { cf ->
                         val root = cf.args?.getOrNull(0) as? View ?: return@Hook
-                        // Scan for known profile header ids within settings preview
                         val idCandidates = listOf(
                             "user_profile_header_primary_name",
                             "user_profile_header_secondary_name",
                             "user_profile_header_name",
                             "profile_header_username",
-                            // settings preview specific ids
                             "settings_user_profile_header_name",
                             "settings_profile_preview_name",
                             "user_profile_header_name_wrap"
@@ -159,7 +152,6 @@ class AtPrefixProfiles : Plugin() {
             }
         } catch (_: Throwable) {}
 
-        // Member Row *TODO remove without borking
         if (enableMemberList) {
         val memberRowCandidates = listOf(
             "com.discord.widgets.user.list.adapter.UserListItem",
@@ -199,7 +191,6 @@ class AtPrefixProfiles : Plugin() {
         }
         }
 
-        // Mini-profile popouts *TODO remove without borking
         if (enableMiniProfile) {
         val miniProfileCandidates = listOf(
             "com.discord.widgets.user.usersheet.WidgetUserSheet",
@@ -239,8 +230,6 @@ class AtPrefixProfiles : Plugin() {
         }
     }
 
-    // No Settings page class
-
     override fun stop(context: Context) {
         patcher.unpatchAll()
         logger.info("AtPrefixProfiles stop")
@@ -250,9 +239,7 @@ class AtPrefixProfiles : Plugin() {
         val text = tv.text?.toString() ?: return
         if (text.isEmpty()) return
         if (text.startsWith("@")) return
-        // Avoid modifying discriminator lines or status text
         if (text.contains("#") || text.contains("\n")) return
-        // Preserve spans if present using SpannableStringBuilder
         val current = tv.text
         if (current is android.text.Spannable) {
             val sb = android.text.SpannableStringBuilder()
@@ -268,7 +255,6 @@ class AtPrefixProfiles : Plugin() {
         try {
             applyAtPrefix(tv)
         } catch (_: Throwable) {
-            // Fallback: attempt safe replace pattern
             val text = tv.text?.toString() ?: return
             if (text.isBlank() || text.startsWith("@")) return
             if (text.contains("#") || text.contains('\n')) return
@@ -277,7 +263,6 @@ class AtPrefixProfiles : Plugin() {
     }
 
     private fun findUsernameTextView(root: View): TextView? {
-        // look for a TextView with large text size or specific id name hints
         val tv = findFirstTextView(root) { candidate ->
             val text = candidate.text?.toString() ?: return@findFirstTextView false
             if (text.isBlank()) return@findFirstTextView false
@@ -331,7 +316,6 @@ class AtPrefixProfiles : Plugin() {
     }
 
     private fun attachReapplyGuards(tv: TextView) {
-        // Reapply after text changes or layout updates
         try {
             tv.addOnLayoutChangeListener { _, _, _, _, _, _, _, _, _ ->
                 applyAtPrefixSafely(tv)
