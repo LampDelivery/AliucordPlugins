@@ -12,6 +12,7 @@ import com.aliucord.settings.delegate
 @AliucordPlugin(requiresRestart = false)
 class AtPrefixProfiles : Plugin() {
     private val debugLog by settings.delegate(true)
+    private val enableMemberList by settings.delegate(true)
     private val enableMiniProfile by settings.delegate(true)
 
     override fun start(context: Context) {
@@ -33,31 +34,40 @@ class AtPrefixProfiles : Plugin() {
                     cls.getMethod("onViewCreated", View::class.java, bundleCls)
                 }
                 patcher.patch(method, Hook { cf ->
-                    val root = cf.args?.getOrNull(0) as? View ?: return@Hook
-                    val idCandidates = listOf(
-                        "user_profile_header_primary_name",
-                        "user_profile_header_secondary_name",
-                        "user_profile_header_name",
-                        "profile_header_username"
-                    )
-                    val pkgCandidates = listOf(
-                        "com.discord",
-                        "com.discord.app",
-                        root.context.packageName
-                    )
-                    val nameView = findByIdNames(root, idCandidates, pkgCandidates)
-                        ?: findUsernameTextView(root)
-                    if (nameView != null) {
-                        applyAtPrefixSafely(nameView)
-                        attachReapplyGuards(nameView)
-                    } else if (debugLog) {
-                        dumpTextViews(root, limit = 50)
+                    try {
+                        val root = cf.args?.getOrNull(0) as? View ?: return@Hook
+                        val idCandidates = listOf(
+                            "user_profile_header_primary_name",
+                            "user_profile_header_secondary_name",
+                            "user_profile_header_name",
+                            "profile_header_username"
+                        )
+                        val pkgCandidates = listOf(
+                            "com.discord",
+                            "com.discord.app",
+                            root.context.packageName
+                        )
+                        val nameView = findByIdNames(root, idCandidates, pkgCandidates)
+                            ?: findUsernameTextView(root)
+                        if (nameView != null) {
+                            logger.info("AtPrefixProfiles: applying @ to view id from candidates: ${nameView.id}")
+                            applyAtPrefixSafely(nameView)
+                            attachReapplyGuards(nameView)
+                        } else {
+                            if (debugLog) {
+                                dumpTextViews(root, limit = 50)
+                            }
+                        }
+                    } catch (e: Throwable) {
+                        logger.error("AtPrefixProfiles: hook body error", e)
                     }
                 })
                 logger.info("AtPrefixProfiles: hooked $name")
                 hooked = true
                 break
-            } catch (_: Throwable) {}
+            } catch (t: Throwable) {
+                logger.info("AtPrefixProfiles: failed to hook $name: ${t.javaClass.simpleName}: ${t.message ?: "no message"}")
+            }
         }
         if (!hooked) logger.info("AtPrefixProfiles: no profile class matched")
 
@@ -73,23 +83,25 @@ class AtPrefixProfiles : Plugin() {
                     for (m in c.declaredMethods) {
                         if (m.name != mName) continue
                         patcher.patch(m, Hook { cf ->
-                            val owner = cf.thisObject
-                            val rootField = owner?.javaClass?.declaredFields?.firstOrNull { f ->
-                                View::class.java.isAssignableFrom(f.type)
-                            }?.apply { isAccessible = true }
-                            val rootView = (rootField?.get(owner) as? View) ?: return@Hook
-                            val idCandidates = listOf(
-                                "user_profile_header_primary_name",
-                                "user_profile_header_secondary_name",
-                                "user_profile_header_name",
-                                "profile_header_username"
-                            )
-                            val pkgCandidates = listOf("com.discord", "com.discord.app", rootView.context.packageName)
-                            val tv = findByIdNames(rootView, idCandidates, pkgCandidates) ?: findUsernameTextView(rootView)
-                            if (tv != null) {
-                                applyAtPrefixSafely(tv)
-                                attachReapplyGuards(tv)
-                            }
+                            try {
+                                val owner = cf.thisObject
+                                val rootField = owner?.javaClass?.declaredFields?.firstOrNull { f ->
+                                    View::class.java.isAssignableFrom(f.type)
+                                }?.apply { isAccessible = true }
+                                val rootView = (rootField?.get(owner) as? View) ?: return@Hook
+                                val idCandidates = listOf(
+                                    "user_profile_header_primary_name",
+                                    "user_profile_header_secondary_name",
+                                    "user_profile_header_name",
+                                    "profile_header_username"
+                                )
+                                val pkgCandidates = listOf("com.discord", "com.discord.app", rootView.context.packageName)
+                                val tv = findByIdNames(rootView, idCandidates, pkgCandidates) ?: findUsernameTextView(rootView)
+                                if (tv != null) {
+                                    applyAtPrefixSafely(tv)
+                                    attachReapplyGuards(tv)
+                                }
+                            } catch (_: Throwable) {}
                         })
                         logger.info("AtPrefixProfiles: bind-time hook applied ${clsName}#${mName}")
                     }
@@ -129,12 +141,52 @@ class AtPrefixProfiles : Plugin() {
                         if (tv != null) {
                             applyAtPrefixSafely(tv)
                             attachReapplyGuards(tv)
+                            logger.info("AtPrefixProfiles: applied @ in settings profile preview")
                         }
                     })
-                    logger.info("AtPrefixProfiles: hooked AppFragment#onViewCreated")
+                    logger.info("AtPrefixProfiles: hooked AppFragment#onViewCreated for settings preview")
                 }
             }
         } catch (_: Throwable) {}
+
+        if (enableMemberList) {
+            val memberRowCandidates = listOf(
+                "com.discord.widgets.user.list.adapter.UserListItem",
+                "com.discord.widgets.user.list.adapter.WidgetUserListAdapterItem",
+                "com.discord.widgets.user.list.adapter.WidgetUserListAdapterItemMember"
+            )
+            for (name in memberRowCandidates) {
+                try {
+                    val cls = Class.forName(name)
+                    for (m in cls.declaredMethods) {
+                        if (m.name == "bind" || m.name == "configure" || m.name == "onConfigure") {
+                            patcher.patch(m, Hook { cf ->
+                                val root = cf.args?.firstOrNull { it is View } as? View
+                                    ?: (cf.thisObject?.let { owner ->
+                                        owner.javaClass.declaredFields.firstOrNull { f ->
+                                            View::class.java.isAssignableFrom(f.type)
+                                        }?.apply { isAccessible = true }?.get(owner) as? View
+                                    })
+                                if (root != null) {
+                                    val idCandidates = listOf(
+                                        "user_list_item_name",
+                                        "member_list_item_name",
+                                        "widget_user_list_item_name"
+                                    )
+                                    val pkgCandidates = listOf("com.discord", root.context.packageName)
+                                    val tv = findByIdNames(root, idCandidates, pkgCandidates) ?: findUsernameTextView(root)
+                                    if (tv != null) {
+                                        applyAtPrefixSafely(tv)
+                                        attachReapplyGuards(tv)
+                                    }
+                                }
+                            })
+                            logger.info("AtPrefixProfiles: hooked member row ${name}#${m.name}")
+                        }
+                    }
+                } catch (_: Throwable) {}
+            }
+        }
 
         if (enableMiniProfile) {
             val miniProfileCandidates = listOf(
@@ -172,59 +224,3 @@ class AtPrefixProfiles : Plugin() {
                     }
                 } catch (_: Throwable) {}
             }
-        }
-    }
-
-    override fun stop(context: Context) {
-        patcher.unpatchAll()
-        logger.info("AtPrefixProfiles stop")
-    }
-
-    private fun applyAtPrefix(tv: TextView) {
-        val text = tv.text?.toString() ?: return
-        if (text.isEmpty()) return
-        if (text.startsWith("@")) return
-        if (text.contains("#") || text.contains("\n")) return
-        val current = tv.text
-        if (current is android.text.Spannable) {
-            val sb = android.text.SpannableStringBuilder()
-                .append("@")
-                .append(current)
-            tv.text = sb
-        } else {
-            tv.text = "@" + text
-        }
-    }
-
-    private fun applyAtPrefixSafely(tv: TextView) {
-        try {
-            applyAtPrefix(tv)
-        } catch (_: Throwable) {
-            val text = tv.text?.toString() ?: return
-            if (text.isBlank() || text.startsWith("@")) return
-            if (text.contains("#") || text.contains('\n')) return
-            tv.post { tv.text = "@" + text }
-        }
-    }
-
-    private fun findUsernameTextView(root: View): TextView? {
-        return findFirstTextView(root) { candidate ->
-            val text = candidate.text?.toString() ?: return@findFirstTextView false
-            if (text.isBlank()) return@findFirstTextView false
-            val lenOk = text.length in 2..32
-            val noAtYet = !text.startsWith("@")
-            val notTag = !text.contains("#")
-            lenOk && noAtYet && notTag
-        }
-    }
-
-    private fun findByIdName(root: View, idName: String, packageName: String? = null): TextView? {
-        return try {
-            val ctx = root.context
-            val pkg = packageName ?: ctx.packageName
-            val id = ctx.resources.getIdentifier(idName, "id", pkg)
-            if (id != 0) root.findViewById<TextView>(id) else null
-        } catch (_: Throwable) {
-            null
-        }
-    }
