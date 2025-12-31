@@ -86,7 +86,6 @@ class ChannelBrowser : Plugin() {
                                 val adapter = rv.adapter ?: return@Hook
                                 val guildId = try { com.discord.stores.StoreStream.getGuildSelected().selectedGuildId } catch (_: Throwable) { null }
 
-                                // Remove header if in DM
                                 if (guildId == null) {
                                     if (adapter is ConcatAdapter) {
                                         val filtered = adapter.adapters.filterNot { it is ChannelBrowserHeaderAdapter }
@@ -256,6 +255,6 @@ class ChannelBrowser : Plugin() {
         }
 
         override fun getItemCount(): Int = 1
-        override fun getItemViewType(position: Int): Int = 10001 // arbitrary stable type
+        override fun getItemViewType(position: Int): Int = 10001
     }
 }
