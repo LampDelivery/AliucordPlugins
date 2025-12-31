@@ -53,7 +53,7 @@ class ChannelBrowserPage(val settings: SettingsAPI, val channels: MutableList<St
 
         for (ch in allChannels.values) {
             val type = try { typeField.getInt(ch) } catch (_: Throwable) { -1 }
-            if (type == 4) continue // skip categories
+            if (type == 4) continue
             val parentId = try { parentIdField.get(ch) as? Long } catch (_: Throwable) { null }
             if (parentId != null && allChannels.containsKey(parentId)) {
                 channelsByCategory.getOrPut(parentId) { mutableListOf() }.add(ch)
@@ -109,7 +109,6 @@ class ChannelBrowserPage(val settings: SettingsAPI, val channels: MutableList<St
                             }
                         }
                         settings.setObject("channels", channels)
-                        // Optionally, update channel rows visually (full rebind if needed)
                         linearLayout.removeAllViews()
                         onViewBound(view)
                     }
