@@ -225,7 +225,7 @@ class ChannelBrowser : Plugin() {
             }
 
             val iconLeftMargin = (6 * scale).toInt()
-            val iconRightMargin = (6 * scale).toInt() // More space between icon and text
+            val iconRightMargin = (6 * scale).toInt() 
             val textLeftMargin = 0 
 
             val icon = ImageView(ctx).apply {
