@@ -41,6 +41,7 @@ class ChannelBrowser : Plugin() {
     private var SettingsAPI.channels by settings.delegate(mutableListOf<String>())
 
     override fun start(context: Context) {
+        settingsTab = SettingsTab(ChannelBrowserSettings::class.java).withArgs(settings)
         patcher.after<`WidgetChannelListModel$Companion$guildListBuilder$$inlined$forEach$lambda$3`>("invoke") {
             val ret = it.result
             val channel = `$channel`
@@ -75,37 +76,48 @@ class ChannelBrowser : Plugin() {
                 try { clazz = Class.forName(name); break } catch (_: Throwable) {}
             }
             if (clazz != null) {
+                val patchHeader = headerPatch@{ boundView: View ->
+                    val container = (boundView as? ViewGroup) ?: return@headerPatch
+                    val rv = findFirstVerticalRecyclerView(container) ?: return@headerPatch
+                    val updateHeader = lambda@ {
+                        val selectedChannel = try { com.discord.stores.StoreStream.getChannelsSelected().selectedChannel } catch (_: Throwable) { null }
+                        val isDM = try { (selectedChannel as? com.aliucord.wrappers.ChannelWrapper)?.isDM() } catch (_: Throwable) { null } ?: false
+                        val isGuildSelected = try { com.discord.stores.StoreStream.getGuildSelected().selectedGuildId != 0L } catch (_: Throwable) { false }
+                        val currentAdapter = rv.adapter ?: return@lambda
+                        if (isDM || !isGuildSelected) {
+                            if (currentAdapter is ConcatAdapter) {
+                                val filtered = currentAdapter.adapters.filterNot { it is ChannelBrowserHeaderAdapter }
+                                rv.adapter = ConcatAdapter(filtered)
+                            }
+                            return@lambda
+                        }
+                        if (!settings.getBool("showHeader", true)) {
+                            if (currentAdapter is ConcatAdapter) {
+                                val filtered = currentAdapter.adapters.filterNot { it is ChannelBrowserHeaderAdapter }
+                                rv.adapter = ConcatAdapter(filtered)
+                            }
+                            return@lambda
+                        }
+                        if (currentAdapter is ConcatAdapter && currentAdapter.adapters.any { it is ChannelBrowserHeaderAdapter }) return@lambda
+                        val headerAdapter = ChannelBrowserHeaderAdapter {
+                            Utils.openPageWithProxy(rv.context, ChannelBrowserPage(settings, settings.channels))
+                        }
+                        rv.adapter = when (currentAdapter) {
+                            is ConcatAdapter -> ConcatAdapter(listOf(headerAdapter) + currentAdapter.adapters)
+                            else -> ConcatAdapter(headerAdapter, currentAdapter)
+                        }
+                    }
+                    updateHeader()
+                    rv.postDelayed({ updateHeader() }, 150)
+                }
                 for (m in clazz!!.declaredMethods) {
-                    if (m.name == "onViewBound") {
+                    if (m.name == "onViewBound" || m.name == "onResume" || m.name == "onStart") {
                         patcher.patch(m, Hook { cf ->
                             try {
                                 val boundView = cf.args?.getOrNull(0) as? View ?: return@Hook
-                                val container = (boundView as? ViewGroup) ?: return@Hook
-
-                                val rv = findFirstVerticalRecyclerView(container) ?: return@Hook
-                                val adapter = rv.adapter ?: return@Hook
-                                val guildId = try { com.discord.stores.StoreStream.getGuildSelected().selectedGuildId } catch (_: Throwable) { null }
-
-                                if (guildId == null) {
-                                    if (adapter is ConcatAdapter) {
-                                        val filtered = adapter.adapters.filterNot { it is ChannelBrowserHeaderAdapter }
-                                        rv.adapter = ConcatAdapter(filtered)
-                                    }
-                                    return@Hook
-                                }
-
-                                if (adapter is ConcatAdapter && adapter.adapters.any { it is ChannelBrowserHeaderAdapter }) return@Hook
-
-                                val headerAdapter = ChannelBrowserHeaderAdapter {
-                                    Utils.openPageWithProxy(rv.context, ChannelBrowserPage(settings, settings.channels))
-                                }
-                                rv.adapter = when (adapter) {
-                                    is ConcatAdapter -> ConcatAdapter(listOf(headerAdapter) + adapter.adapters)
-                                    else -> ConcatAdapter(headerAdapter, adapter)
-                                }
+                                patchHeader(boundView)
                             } catch (_: Throwable) {}
                         })
-                        break
                     }
                 }
             }
@@ -150,6 +162,7 @@ class ChannelBrowser : Plugin() {
                     setOnClickListener {
                         Utils.openPageWithProxy(lay.context, ChannelBrowserSettings(settings))
                     }
+                    visibility = View.GONE 
                 }.addTo(lay)
             }
         }

@@ -11,43 +11,45 @@ import com.aliucord.settings.delegate
 import com.aliucord.utils.MDUtils
 import com.aliucord.utils.ViewUtils.addTo
 import com.lytefast.flexinput.R
+import com.discord.views.CheckedSetting
 
 class ChannelBrowserSettings(private val settings: SettingsAPI) : SettingsPage() {
-    private var SettingsAPI.showHeader by settings.delegate(true)
-    private var SettingsAPI.confirmActions by settings.delegate(true)
 
     override fun onViewBound(view: View) {
         super.onViewBound(view)
 
         setActionBarTitle("Channel Browser Settings")
         setActionBarSubtitle("Customize behaviour")
+        val ctx = requireContext()
 
-        TextView(context, null, 0, R.i.UiKit_Settings_Item_SubText).apply {
-            text = MDUtils.render("Configure Channel Browser options.")
-            typeface = ResourcesCompat.getFont(context, Constants.Fonts.whitney_medium)
-            textSize = 14f
-        }.addTo(linearLayout)
-
-        TextView(context, null, 0, R.i.UiKit_Settings_Item).apply {
-            text = MDUtils.render("Show Manage Channels header: ${if (settings.showHeader) "On" else "Off"}")
-            typeface = ResourcesCompat.getFont(context, Constants.Fonts.whitney_medium)
-            textSize = 16f
-            setOnClickListener {
-                settings.showHeader = !settings.showHeader
-                text = MDUtils.render("Show Manage Channels header: ${if (settings.showHeader) "On" else "Off"}")
-                Utils.showToast(if (settings.showHeader) "Header enabled" else "Header disabled")
+        addView(
+            Utils.createCheckedSetting(
+                ctx,
+                CheckedSetting.ViewType.SWITCH,
+                "Enable header (EXPERIMENTAL)",
+                "Show a header in the channel list to mimic RN"
+            ).apply {
+                isChecked = settings.getBool("showHeader", false)
+                setOnCheckedListener {
+                    settings.setBool("showHeader", it)
+                    Utils.promptRestart()
+                }
             }
-        }.addTo(linearLayout)
+        )
 
-        TextView(context, null, 0, R.i.UiKit_Settings_Item).apply {
-            text = MDUtils.render("Confirm channel actions: ${if (settings.confirmActions) "On" else "Off"}")
-            typeface = ResourcesCompat.getFont(context, Constants.Fonts.whitney_medium)
-            textSize = 16f
-            setOnClickListener {
-                settings.confirmActions = !settings.confirmActions
-                text = MDUtils.render("Confirm channel actions: ${if (settings.confirmActions) "On" else "Off"}")
-                Utils.showToast(if (settings.confirmActions) "Confirmations enabled" else "Confirmations disabled")
+        addView(
+            Utils.createCheckedSetting(
+                ctx,
+                CheckedSetting.ViewType.SWITCH,
+                "Confirm channel actions",
+                "Require confirmation to modify channel list"
+            ).apply {
+                isChecked = settings.getBool("confirmActions", false)
+                setOnCheckedListener {
+                    settings.setBool("confirmActions", it)
+                    Utils.promptRestart()
+                }
             }
-        }.addTo(linearLayout)
+        )
     }
 }
