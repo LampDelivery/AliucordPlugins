@@ -124,11 +124,13 @@ class ChannelBrowser : Plugin() {
                 v is TextView && v.text?.toString()?.contains("Channel Browser Settings") == true
             }
             if (!alreadyHasBrowse) {
-                TextView(lay.context, null, 0, R.i.UiKit_Settings_Item).apply {
+                TextView(lay.context, null, 0, R.i.UiKit_Settings_Item_Icon).apply {
+                    val scale = context.resources.displayMetrics.density
+                    val pd = (16 * scale).toInt()
+                    setPadding(pd, pd, pd, pd)
+                    typeface = ResourcesCompat.getFont(context, Constants.Fonts.whitney_semibold)
                     text = MDUtils.render("Browse Channels")
-                    typeface = ResourcesCompat.getFont(context, Constants.Fonts.whitney_medium)
                     textSize = 16f
-                    
                     setOnClickListener {
                         Utils.openPageWithProxy(lay.context, ChannelBrowserPage(settings, settings.channels))
                     }
