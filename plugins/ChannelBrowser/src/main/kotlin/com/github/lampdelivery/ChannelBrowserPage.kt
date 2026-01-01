@@ -56,8 +56,7 @@ class ChannelBrowserPage(val settings: SettingsAPI, val channels: MutableList<St
         val parentIdField = com.discord.api.channel.Channel::class.java.getDeclaredField("parentId").apply { isAccessible = true }
         val idField = com.discord.api.channel.Channel::class.java.getDeclaredField("id").apply { isAccessible = true }
         val nameField = com.discord.api.channel.Channel::class.java.getDeclaredField("name").apply { isAccessible = true }
-
-        // DM/server/invalid context detection
+        
         val channelNames = allChannels.values.map {
             try { nameField.get(it) as? String ?: "Unnamed Channel" } catch (_: Throwable) { "Unnamed Channel" }
         }
@@ -66,11 +65,9 @@ class ChannelBrowserPage(val settings: SettingsAPI, val channels: MutableList<St
         val threshold = 3
         val mostlyUnnamed = totalCount > 0 && unnamedCount >= totalCount * 2 / 3
         if (guildId == 0L) {
-            // Hide the page completely in DMs
             activity?.finish()
             return
         } else if (totalCount < threshold || mostlyUnnamed) {
-            // Show warning only for suspicious cases in servers
             val warning = TextView(ctx, null, 0, com.lytefast.flexinput.R.i.UiKit_Settings_Item).apply {
                 text = "Channel Browser is only available in servers."
                 typeface = ResourcesCompat.getFont(ctx, Constants.Fonts.whitney_bold)
