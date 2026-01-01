@@ -1,8 +1,7 @@
 package com.github.lampdelivery
 
-import com.aliucord.utils.GsonUtils
+import android.annotation.SuppressLint
 import com.aliucord.utils.ViewUtils.addTo
-// import com.aliucord.utils.ThemeUtils
 import android.view.Gravity
 import android.view.View
 import android.content.Context
@@ -10,30 +9,18 @@ import android.widget.*
 import androidx.appcompat.app.AlertDialog
 import androidx.core.content.res.ResourcesCompat
 import androidx.core.content.ContextCompat
-// import com.aliucord.utils.ColorCompat
 import com.aliucord.Constants
-import com.aliucord.Http.*
-import com.aliucord.Utils
-import com.aliucord.Logger
 import com.aliucord.api.SettingsAPI
 import com.lytefast.flexinput.R
 import com.aliucord.fragments.SettingsPage
-import com.aliucord.settings.delegate
-import com.aliucord.wrappers.ChannelWrapper.Companion.id
-import com.aliucord.wrappers.ChannelWrapper.Companion.lastMessageId
-import com.aliucord.wrappers.ChannelWrapper.Companion.name
-import com.aliucord.wrappers.ChannelWrapper.Companion.topic
-import com.aliucord.wrappers.GuildWrapper.Companion.channels
 import com.discord.stores.StoreStream
 
 
 class ChannelBrowserPage(val settings: SettingsAPI, val channels: MutableList<String>) : SettingsPage() {
-    fun themeAlertDialogText(dialog: androidx.appcompat.app.AlertDialog, ctx: Context) {
+    fun themeAlertDialogText(dialog: AlertDialog, ctx: Context) {
         try {
-            val textColorRes = try { com.lytefast.flexinput.R.c.primary_dark } catch (_: Throwable) {
-                ctx.resources.getIdentifier("material_on_surface", "color", ctx.packageName)
-            }
-            val textColor = if (textColorRes != 0) ContextCompat.getColor(ctx, textColorRes) else android.graphics.Color.parseColor("#212121")
+            val textColorRes = R.c.primary_dark
+            val textColor = ContextCompat.getColor(ctx, textColorRes)
             dialog.window?.decorView?.post {
                 val messageId = android.R.id.message
                 val messageView = dialog.findViewById<TextView>(messageId)
@@ -43,6 +30,7 @@ class ChannelBrowserPage(val settings: SettingsAPI, val channels: MutableList<St
         } catch (_: Throwable) {}
     }
 
+    @SuppressLint("SetTextI18n")
     override fun onViewBound(view: View) {
         super.onViewBound(view)
 
@@ -68,15 +56,7 @@ class ChannelBrowserPage(val settings: SettingsAPI, val channels: MutableList<St
             activity?.finish()
             return
         } else if (totalCount < threshold || mostlyUnnamed) {
-            val warning = TextView(ctx, null, 0, com.lytefast.flexinput.R.i.UiKit_Settings_Item).apply {
-                text = "Channel Browser is only available in servers."
-                typeface = ResourcesCompat.getFont(ctx, Constants.Fonts.whitney_bold)
-                textSize = 16f
-                setPadding(32, 64, 32, 32)
-                gravity = Gravity.CENTER
-            }
             linearLayout.removeAllViews()
-            warning.addTo(linearLayout)
             return
         }
 
@@ -97,12 +77,6 @@ class ChannelBrowserPage(val settings: SettingsAPI, val channels: MutableList<St
             }
         }
 
-
-        fun getErrorColor(): Int = try {
-            val colorId = ctx.resources.getIdentifier("colorError", "color", ctx.packageName)
-            if (colorId != 0) androidx.core.content.ContextCompat.getColor(ctx, colorId)
-            else 0x44FF0000.toInt()
-        } catch (_: Throwable) { 0x44FF0000.toInt() }
 
         for (cat in categories) {
             val catName = try { nameField.get(cat) as? String ?: "Unnamed Category" } catch (_: Throwable) { "Unnamed Category" }
@@ -153,10 +127,8 @@ class ChannelBrowserPage(val settings: SettingsAPI, val channels: MutableList<St
                         }
                     }
                     if (settings.getBool("confirmActions", false)) {
-                        val textColorRes = try { com.lytefast.flexinput.R.c.primary_dark } catch (_: Throwable) {
-                            ctx.resources.getIdentifier("material_on_surface", "color", ctx.packageName)
-                        }
-                        val textColor = if (textColorRes != 0) ContextCompat.getColor(ctx, textColorRes) else android.graphics.Color.parseColor("#212121")
+                        val textColorRes = R.c.primary_dark
+                        val textColor = ContextCompat.getColor(ctx, textColorRes)
                         val customTitle = TextView(ctx).apply {
                             text = if (!checked) "Unfollow Category" else "Follow Category"
                             setTextColor(textColor)
@@ -164,7 +136,7 @@ class ChannelBrowserPage(val settings: SettingsAPI, val channels: MutableList<St
                             textSize = 20f
                             setPadding(32, 32, 32, 16)
                         }
-                        val themedDialog = androidx.appcompat.app.AlertDialog.Builder(ctx)
+                        val themedDialog = AlertDialog.Builder(ctx)
                             .setCustomTitle(customTitle)
                             .setMessage("Are you sure you want to ${if (!checked) "unfollow" else "follow"} this category?")
                             .setPositiveButton("Yes") { _: android.content.DialogInterface, _: Int -> doAction() }
@@ -201,7 +173,7 @@ class ChannelBrowserPage(val settings: SettingsAPI, val channels: MutableList<St
             val children = if (catId != null) channelsByCategory[catId] else null
             if (children != null) {
                 for (ch in children) {
-                    addChannelRowReflect(ch, guildId, ctx, getErrorColor(), nameField, true)
+                    addChannelRowReflect(ch, guildId, ctx, nameField)
                 }
             }
         }
@@ -214,7 +186,7 @@ class ChannelBrowserPage(val settings: SettingsAPI, val channels: MutableList<St
                 setPadding(0, 24, 0, 8)
             }.addTo(linearLayout)
             for (ch in uncategorized) {
-                addChannelRowReflect(ch, guildId, ctx, getErrorColor(), nameField)
+                addChannelRowReflect(ch, guildId, ctx, nameField)
             }
         }
     }
@@ -223,9 +195,7 @@ class ChannelBrowserPage(val settings: SettingsAPI, val channels: MutableList<St
         ch: com.discord.api.channel.Channel,
         guildId: Long,
         ctx: Context,
-        errorColor: Int,
-        nameField: java.lang.reflect.Field,
-        alignCheckbox: Boolean = false
+        nameField: java.lang.reflect.Field
     ) {
         val chName = try { nameField.get(ch) as? String ?: "Unnamed Channel" } catch (_: Throwable) { "Unnamed Channel" }
         val channelKey = "$chName-$guildId"
@@ -251,7 +221,7 @@ class ChannelBrowserPage(val settings: SettingsAPI, val channels: MutableList<St
             layoutParams = LinearLayout.LayoutParams(LinearLayout.LayoutParams.WRAP_CONTENT, LinearLayout.LayoutParams.WRAP_CONTENT).apply {
                 gravity = Gravity.CENTER_VERTICAL
             }
-            var suppressListener = false
+            val suppressListener = false
             setOnCheckedChangeListener { buttonView, checked ->
                 if (suppressListener) return@setOnCheckedChangeListener
                 val previousState = !checked
@@ -264,12 +234,8 @@ class ChannelBrowserPage(val settings: SettingsAPI, val channels: MutableList<St
                     settings.setObject("channels", channels)
                     row.alpha = if (!checked) 0.5f else 1.0f
                 }
-                val confirm = settings.getBool("confirmActions", false)
-                if (confirm) {
-                    val textColorRes = try { com.lytefast.flexinput.R.c.primary_dark } catch (_: Throwable) {
-                        ctx.resources.getIdentifier("material_on_surface", "color", ctx.packageName)
-                    }
-                    val textColor = if (textColorRes != 0) ContextCompat.getColor(ctx, textColorRes) else android.graphics.Color.parseColor("#212121")
+                if (settings.getBool("confirmActions", false)) {
+                    val textColor = ContextCompat.getColor(ctx, R.c.primary_dark)
                     val customTitle = TextView(ctx).apply {
                         text = if (!checked) "Hide Channel" else "Restore Channel"
                         setTextColor(textColor)
@@ -281,16 +247,11 @@ class ChannelBrowserPage(val settings: SettingsAPI, val channels: MutableList<St
                         .setCustomTitle(customTitle)
                         .setMessage("Are you sure you want to ${if (!checked) "hide" else "restore"} this channel?")
                         .setPositiveButton("Yes") { _: android.content.DialogInterface, _: Int -> doAction() }
-                        .setNegativeButton("No") { dialog, _ ->
-                            suppressListener = true
+                        .setNegativeButton("No") { _: android.content.DialogInterface, _ ->
                             buttonView.isChecked = previousState
-                            suppressListener = false
-                            dialog.dismiss()
                         }
                         .setOnCancelListener {
-                            suppressListener = true
                             buttonView.isChecked = previousState
-                            suppressListener = false
                         }
                         .create()
                     themedDialog.show()
@@ -306,19 +267,4 @@ class ChannelBrowserPage(val settings: SettingsAPI, val channels: MutableList<St
         row.addTo(linearLayout)
     }
 
-    fun deleteChannel(string: String, id: Long) {
-        try {
-            if ("$string-$id" !in channels) {
-                channels += "$string-$id"
-                settings.setObject("channels", channels)
-                Utils.showToast("Channel $string has been removed, Please restart to take effect!")
-            } else {
-                channels -= "$string-$id"
-                settings.setObject("channels", channels)
-                Utils.showToast("Channel $string has been restored, Please restart to take effect!")
-            }
-        } catch (e: Exception) {
-            Utils.showToast("Failed to remove channel")
-        }
-    }
 }

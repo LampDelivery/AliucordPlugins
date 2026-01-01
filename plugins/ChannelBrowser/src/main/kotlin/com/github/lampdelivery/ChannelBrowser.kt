@@ -152,7 +152,7 @@ class ChannelBrowser : Plugin() {
         patcher.unpatchAll()
     }
 
-    private fun findFirstVerticalRecyclerView(root: ViewGroup): androidx.recyclerview.widget.RecyclerView? {
+    private fun findFirstVerticalRecyclerView(root: ViewGroup): RecyclerView? {
         fun scan(v: View): RecyclerView? {
             if (v is RecyclerView) {
                 val lm = v.layoutManager
@@ -208,10 +208,10 @@ class ChannelBrowser : Plugin() {
             val textLeftMargin = 0 
 
             val icon = ImageView(ctx).apply {
-                val resId = try { com.lytefast.flexinput.R.e.ic_menu_24dp } catch (_: Throwable) { android.R.drawable.ic_menu_sort_by_size }
+                val resId = try { R.e.ic_menu_24dp } catch (_: Throwable) { android.R.drawable.ic_menu_sort_by_size }
                 val drawable = androidx.core.content.ContextCompat.getDrawable(ctx, resId)?.mutate()
                 try {
-                    val color = ColorCompat.getThemedColor(ctx, com.lytefast.flexinput.R.b.colorInteractiveNormal)
+                    val color = ColorCompat.getThemedColor(ctx, R.b.colorInteractiveNormal)
                     drawable?.setTint(color)
                 } catch (_: Throwable) {}
                 setImageDrawable(drawable)
@@ -224,11 +224,11 @@ class ChannelBrowser : Plugin() {
             }
             row.addView(icon)
 
-            val tv = TextView(ctx, null, 0, com.lytefast.flexinput.R.i.UiKit_Settings_Item).apply {
+            val tv = TextView(ctx, null, 0, R.i.UiKit_Settings_Item).apply {
                 setText("Browse Channels")
                 typeface = ResourcesCompat.getFont(ctx, Constants.Fonts.whitney_medium)
                 textSize = 16f
-                val colorRes = try { com.lytefast.flexinput.R.c.primary_dark } catch (_: Throwable) { android.R.color.black }
+                val colorRes = try { R.c.primary_dark } catch (_: Throwable) { android.R.color.black }
                 val color = try { androidx.core.content.ContextCompat.getColor(ctx, colorRes) } catch (_: Throwable) { 0xFF000000.toInt() }
                 setTextColor(color)
                 maxLines = 1

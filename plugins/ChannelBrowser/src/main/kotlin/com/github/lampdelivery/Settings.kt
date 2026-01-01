@@ -1,16 +1,9 @@
 package com.github.lampdelivery
 
 import android.view.View
-import android.widget.TextView
-import androidx.core.content.res.ResourcesCompat
-import com.aliucord.Constants
 import com.aliucord.Utils
 import com.aliucord.api.SettingsAPI
 import com.aliucord.fragments.SettingsPage
-import com.aliucord.settings.delegate
-import com.aliucord.utils.MDUtils
-import com.aliucord.utils.ViewUtils.addTo
-import com.lytefast.flexinput.R
 import com.discord.views.CheckedSetting
 
 class ChannelBrowserSettings(private val settings: SettingsAPI) : SettingsPage() {
