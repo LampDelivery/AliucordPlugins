@@ -1,10 +1,8 @@
 package com.github.lampdelivery
 
 import android.content.Context
-import android.os.Bundle
 import android.view.View
 import android.view.ViewGroup
-import android.widget.FrameLayout
 import android.widget.LinearLayout
 import android.widget.TextView
 import android.widget.ImageView
@@ -22,18 +20,14 @@ import com.aliucord.utils.MDUtils
 import com.aliucord.utils.ReflectUtils
 import com.aliucord.utils.ViewUtils.addTo
 import com.aliucord.wrappers.ChannelWrapper.Companion.name
-import com.discord.models.guild.Guild
-import com.discord.utilities.permissions.PermissionUtils
 import com.discord.widgets.channels.list.`WidgetChannelListModel$Companion$guildListBuilder$$inlined$forEach$lambda$3`
 import com.discord.widgets.guilds.profile.WidgetGuildProfileSheet
 import com.aliucord.utils.ViewUtils.findViewById
 import com.discord.databinding.WidgetGuildProfileSheetBinding
-import com.discord.stores.StoreStream
 import com.discord.widgets.guilds.profile.WidgetGuildProfileSheetViewModel
 import com.lytefast.flexinput.R
 import androidx.recyclerview.widget.ConcatAdapter
 import androidx.recyclerview.widget.RecyclerView
-import com.discord.api.channel.Channel as ApiChannel
 
 
 @AliucordPlugin
@@ -43,7 +37,6 @@ class ChannelBrowser : Plugin() {
     override fun start(context: Context) {
         settingsTab = SettingsTab(ChannelBrowserSettings::class.java).withArgs(settings)
         patcher.after<`WidgetChannelListModel$Companion$guildListBuilder$$inlined$forEach$lambda$3`>("invoke") {
-            val ret = it.result
             val channel = `$channel`
             val channelName = channel.name
 
@@ -53,17 +46,6 @@ class ChannelBrowser : Plugin() {
             if (!settings.channels.contains("$channelName-$guildId")) return@after
 
             it.result = null
-
-            try {
-                val chanIdField = try { ApiChannel::class.java.getDeclaredField("id").apply { isAccessible = true } } catch (_: Throwable) { null }
-                val nameField = try { ApiChannel::class.java.getDeclaredField("name").apply { isAccessible = true } } catch (_: Throwable) { null }
-                val chanId = try { chanIdField?.get(channel) as? Long } catch (_: Throwable) { null }
-                val localNameMap = settings.getObject("names", MutableMap::class.java) as? MutableMap<Long, String>
-                val newName = if (chanId != null) localNameMap?.get(chanId) else null
-                if (newName != null && nameField != null) {
-                    nameField.set(channel, newName)
-                }
-            } catch (_: Throwable) {}
         }
 
         try {
@@ -80,18 +62,16 @@ class ChannelBrowser : Plugin() {
                     val container = (boundView as? ViewGroup) ?: return@headerPatch
                     val rv = findFirstVerticalRecyclerView(container) ?: return@headerPatch
                     val updateHeader = lambda@ {
-                        val selectedChannel = try { com.discord.stores.StoreStream.getChannelsSelected().selectedChannel } catch (_: Throwable) { null }
-                        val isDM = try { (selectedChannel as? com.aliucord.wrappers.ChannelWrapper)?.isDM() } catch (_: Throwable) { null } ?: false
                         val isGuildSelected = try { com.discord.stores.StoreStream.getGuildSelected().selectedGuildId != 0L } catch (_: Throwable) { false }
                         val currentAdapter = rv.adapter ?: return@lambda
-                        if (isDM || !isGuildSelected) {
+                        if (!isGuildSelected) {
                             if (currentAdapter is ConcatAdapter) {
                                 val filtered = currentAdapter.adapters.filterNot { it is ChannelBrowserHeaderAdapter }
                                 rv.adapter = ConcatAdapter(filtered)
                             }
                             return@lambda
                         }
-                        if (!settings.getBool("showHeader", true)) {
+                        if (!settings.getBool("showHeader", false)) {
                             if (currentAdapter is ConcatAdapter) {
                                 val filtered = currentAdapter.adapters.filterNot { it is ChannelBrowserHeaderAdapter }
                                 rv.adapter = ConcatAdapter(filtered)
@@ -110,7 +90,7 @@ class ChannelBrowser : Plugin() {
                     updateHeader()
                     rv.postDelayed({ updateHeader() }, 150)
                 }
-                for (m in clazz!!.declaredMethods) {
+                for (m in clazz.declaredMethods) {
                     if (m.name == "onViewBound" || m.name == "onResume" || m.name == "onStart") {
                         patcher.patch(m, Hook { cf ->
                             try {
@@ -124,7 +104,7 @@ class ChannelBrowser : Plugin() {
         } catch (_: Throwable) {}
 
         patcher.after<WidgetGuildProfileSheet>("configureTabItems", Long::class.java,
-            WidgetGuildProfileSheetViewModel.TabItems::class.java, Boolean::class.java) { param ->
+            WidgetGuildProfileSheetViewModel.TabItems::class.java, Boolean::class.java) {
             val bindingMethod = ReflectUtils.getMethodByArgs(WidgetGuildProfileSheet::class.java, "getBinding")
             val binding = bindingMethod.invoke(this) as WidgetGuildProfileSheetBinding
 
@@ -173,17 +153,20 @@ class ChannelBrowser : Plugin() {
     }
 
     private fun findFirstVerticalRecyclerView(root: ViewGroup): androidx.recyclerview.widget.RecyclerView? {
-        fun scan(v: View): androidx.recyclerview.widget.RecyclerView? {
-            if (v is androidx.recyclerview.widget.RecyclerView) {
+        fun scan(v: View): RecyclerView? {
+            if (v is RecyclerView) {
                 val lm = v.layoutManager
-                if (lm is androidx.recyclerview.widget.LinearLayoutManager && lm.orientation == androidx.recyclerview.widget.RecyclerView.VERTICAL) {
+                if (lm is androidx.recyclerview.widget.LinearLayoutManager && lm.orientation == RecyclerView.VERTICAL) {
                     return v
                 }
             }
             if (v is ViewGroup) {
-                for (i in 0 until v.childCount) {
+                val count = v.childCount
+                var i = 0
+                while (i < count) {
                     val r = scan(v.getChildAt(i))
                     if (r != null) return r
+                    i++
                 }
             }
             return null
@@ -191,10 +174,6 @@ class ChannelBrowser : Plugin() {
         return scan(root)
     }
 
-    private fun dp(view: View, dp: Float): Int {
-        val d = view.resources.displayMetrics
-        return (dp * d.density + 0.5f).toInt()
-    }
 
     private class ChannelBrowserHeaderAdapter(
         val onClick: () -> Unit
@@ -225,7 +204,7 @@ class ChannelBrowser : Plugin() {
             }
 
             val iconLeftMargin = (6 * scale).toInt()
-            val iconRightMargin = (6 * scale).toInt() // More space between icon and text
+            val iconRightMargin = (6 * scale).toInt() 
             val textLeftMargin = 0 
 
             val icon = ImageView(ctx).apply {
@@ -246,7 +225,7 @@ class ChannelBrowser : Plugin() {
             row.addView(icon)
 
             val tv = TextView(ctx, null, 0, com.lytefast.flexinput.R.i.UiKit_Settings_Item).apply {
-                text = "Browse Channels"
+                setText("Browse Channels")
                 typeface = ResourcesCompat.getFont(ctx, Constants.Fonts.whitney_medium)
                 textSize = 16f
                 val colorRes = try { com.lytefast.flexinput.R.c.primary_dark } catch (_: Throwable) { android.R.color.black }

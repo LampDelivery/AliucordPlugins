@@ -66,5 +66,7 @@ subprojects {
         compileOnly(libs.discord)
         compileOnly(libs.aliucord)
         compileOnly(libs.kotlin.stdlib)
+        implementation("com.google.code.gson:gson:2.10.1")
+        implementation("com.google.protobuf:protobuf-javalite:3.24.4")
     }
 }

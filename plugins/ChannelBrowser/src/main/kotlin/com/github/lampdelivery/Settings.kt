@@ -47,7 +47,6 @@ class ChannelBrowserSettings(private val settings: SettingsAPI) : SettingsPage()
                 isChecked = settings.getBool("confirmActions", false)
                 setOnCheckedListener {
                     settings.setBool("confirmActions", it)
-                    Utils.promptRestart()
                 }
             }
         )

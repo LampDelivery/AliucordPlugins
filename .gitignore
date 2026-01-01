@@ -6,6 +6,9 @@
 **/.cxx/
 **/.externalNativeBuild/
 
+# Protobuf definitions (ChannelBrowser plugin)
+plugins/ChannelBrowser/src/main/proto/
+
 # Editor
 /.vscode/
 /.idea/
