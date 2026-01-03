@@ -16,7 +16,8 @@ class CustomTimestampSettings(private val settings: SettingsAPI) : SettingsPage(
         val ctx = requireContext()
         val textInput = TextInput(ctx)
         textInput.setHint(hint)
-        textInput.getEditText().setHintTextColor(0xFF888888.toInt())
+        val mainTextColor = textInput.getEditText().currentTextColor
+        textInput.getEditText().setHintTextColor(mainTextColor)
         textInput.getEditText().setText(initial)
         textInput.getEditText().setSingleLine(false)
         textInput.getEditText().maxLines = 3
@@ -77,7 +78,7 @@ class CustomTimestampSettings(private val settings: SettingsAPI) : SettingsPage(
         addView(dateFormatSelector)
 
         addTextInput(
-            hint = "Today Replacement (leave blank to remove, use %date% for date)",
+            hint = "Today Replacement (leave blank to remove)",
             initial = todayReplacement
         ) {
             settings.setString("todayReplacement", it)
@@ -91,7 +92,7 @@ class CustomTimestampSettings(private val settings: SettingsAPI) : SettingsPage(
         addView(space)
         val yesterdayReplacement = settings.getString("yesterdayReplacement", "")
         addTextInput(
-            hint = "Yesterday Replacement (leave blank to remove, use %date% for date)",
+            hint = "Yesterday Replacement (leave blank to remove)",
             initial = yesterdayReplacement
         ) {
             settings.setString("yesterdayReplacement", it)
