@@ -16,8 +16,11 @@ class CustomTimestampSettings(private val settings: SettingsAPI) : SettingsPage(
         val ctx = requireContext()
         val textInput = TextInput(ctx)
         textInput.setHint(hint)
+        textInput.getEditText().setHintTextColor(0xFF888888.toInt())
         textInput.getEditText().setText(initial)
-        textInput.getEditText().setSingleLine()
+        textInput.getEditText().setSingleLine(false)
+        textInput.getEditText().maxLines = 3
+        textInput.getEditText().isSingleLine = false
         textInput.getEditText().addTextChangedListener(object : TextWatcher {
             override fun beforeTextChanged(s: CharSequence?, start: Int, count: Int, after: Int) {}
             override fun onTextChanged(s: CharSequence?, start: Int, before: Int, count: Int) {}
@@ -94,6 +97,14 @@ class CustomTimestampSettings(private val settings: SettingsAPI) : SettingsPage(
             settings.setString("yesterdayReplacement", it)
             Utils.promptRestart("Restart required to apply changes.")
         }
+
+        val infoText = android.widget.TextView(requireContext()).apply {
+            text = "Tip: Use %date% in the box to insert the formatted date."
+            textSize = 12f
+            setTextColor(0xFF888888.toInt())
+            setPadding(0, (4 * resources.displayMetrics.density).toInt(), 0, (8 * resources.displayMetrics.density).toInt())
+        }
+        addView(infoText)
 
         addView(
             Utils.createCheckedSetting(
