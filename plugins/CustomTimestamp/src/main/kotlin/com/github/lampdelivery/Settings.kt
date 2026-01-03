@@ -38,11 +38,11 @@ class CustomTimestampSettings(private val settings: SettingsAPI) : SettingsPage(
         val defaultFormat = "MMM dd, yyyy"
         val currentFormat = settings.getString("customDateFormat", defaultFormat)
         var currentIndex = formatOptions.indexOf(currentFormat).let { if (it == -1) formatOptions.indexOf(defaultFormat) else it }
-        val dateFormatSelector = com.github.customtimestamp.Selector(ctx).apply {
+        val dateFormatSelector = com.github.lampdelivery.Selector(ctx).apply {
             setLabel("Date Format")
             setValue(formatLabels[currentIndex])
             setSelectorClickListener(View.OnClickListener {
-                val dialog = com.github.customtimestamp.SelectDialog()
+                val dialog = com.github.lampdelivery.SelectDialog()
                 dialog.setItems(formatLabels)
                 dialog.setTitle("Select Date Format")
                 dialog.setOnResultListener { which ->
