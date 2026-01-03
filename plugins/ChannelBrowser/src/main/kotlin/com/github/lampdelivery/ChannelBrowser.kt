@@ -79,8 +79,6 @@ class ChannelBrowser : Plugin() {
                     typeface = ResourcesCompat.getFont(context, Constants.Fonts.whitney_semibold)
                     text = "Browse Channels"
                     textSize = 16f
-                    maxLines = 1
-                    ellipsize = android.text.TextUtils.TruncateAt.END
                     gravity = android.view.Gravity.CENTER_VERTICAL
                     layoutParams = LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT)
                     setOnClickListener {
@@ -149,8 +147,7 @@ class ChannelBrowser : Plugin() {
                 val colorRes = try { R.c.primary_dark } catch (_: Throwable) { android.R.color.black }
                 val color = try { androidx.core.content.ContextCompat.getColor(ctx, colorRes) } catch (_: Throwable) { 0xFF000000.toInt() }
                 setTextColor(color)
-                maxLines = 1
-                ellipsize = android.text.TextUtils.TruncateAt.END
+                // maxLines and ellipsize removed to allow full text
                 gravity = android.view.Gravity.CENTER_VERTICAL
                 layoutParams = LinearLayout.LayoutParams(LinearLayout.LayoutParams.WRAP_CONTENT, LinearLayout.LayoutParams.WRAP_CONTENT).apply {
                     leftMargin = textLeftMargin

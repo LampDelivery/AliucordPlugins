@@ -93,18 +93,30 @@ class CustomTimestamp : Plugin() {
                         var hour24 = hour
                         if (ampm == "PM" && hour != 12) hour24 += 12
                         if (ampm == "AM" && hour == 12) hour24 = 0
+                        // 12PM should be 12, 12AM should be 0
                         String.format("%02d:%s", hour24, minute)
                     }
                 } else {
                     text = regex24.replace(text) { match ->
                         val hour = match.groupValues[1].toInt()
                         val minute = match.groupValues[2]
-                        if (text.contains("AM", ignoreCase = true) || text.contains("PM", ignoreCase = true)) {
-                            String.format("%d:%s", if (hour == 0) 12 else if (hour > 12) hour - 12 else hour, minute)
-                        } else {
-                            val ampm = if (hour < 12) "AM" else "PM"
+                        val hasAmPm = text.contains("AM", ignoreCase = true) || text.contains("PM", ignoreCase = true)
+                        if (hasAmPm) {
                             val hour12 = when {
-                                hour == 0 -> 12
+                                hour == 0 || hour == 12 -> 12
+                                hour > 12 -> hour - 12
+                                else -> hour
+                            }
+                            String.format("%d:%s", hour12, minute)
+                        } else {
+                            val ampm = when {
+                                hour == 0 -> "AM"
+                                hour == 12 -> "PM"
+                                hour < 12 -> "AM"
+                                else -> "PM"
+                            }
+                            val hour12 = when {
+                                hour == 0 || hour == 12 -> 12
                                 hour > 12 -> hour - 12
                                 else -> hour
                             }

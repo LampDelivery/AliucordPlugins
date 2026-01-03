@@ -17,6 +17,24 @@ import com.discord.stores.StoreStream
 
 
 class ChannelBrowserPage(val settings: SettingsAPI, val channels: MutableList<String>) : SettingsPage() {
+                private val handler = android.os.Handler(android.os.Looper.getMainLooper())
+            private var lastView: View? = null
+        // Fetches the user's guild channel settings from Discord API
+    fun fetchGuildSettings(): Map<String, Any>? {
+        return try {
+            val req = com.aliucord.Http.Request.newDiscordRNRequest("/users/@me/guilds/settings", "GET")
+            val res = req.execute()
+            if (res.ok()) {
+                val json = res.text()
+                @Suppress("UNCHECKED_CAST")
+                com.google.gson.Gson().fromJson(json, Map::class.java) as? Map<String, Any>
+            } else null
+        } catch (e: Exception) {
+            e.printStackTrace()
+            null
+        }
+    }
+
     fun themeAlertDialogText(dialog: AlertDialog, ctx: Context) {
         try {
             val textColorRes = R.c.primary_dark
@@ -32,6 +50,7 @@ class ChannelBrowserPage(val settings: SettingsAPI, val channels: MutableList<St
 
     @SuppressLint("SetTextI18n")
     override fun onViewBound(view: View) {
+            lastView = view
         super.onViewBound(view)
 
         setActionBarTitle("Channel Browser")
@@ -44,21 +63,21 @@ class ChannelBrowserPage(val settings: SettingsAPI, val channels: MutableList<St
         val parentIdField = com.discord.api.channel.Channel::class.java.getDeclaredField("parentId").apply { isAccessible = true }
         val idField = com.discord.api.channel.Channel::class.java.getDeclaredField("id").apply { isAccessible = true }
         val nameField = com.discord.api.channel.Channel::class.java.getDeclaredField("name").apply { isAccessible = true }
-        
-        val channelNames = allChannels.values.map {
-            try { nameField.get(it) as? String ?: "Unnamed Channel" } catch (_: Throwable) { "Unnamed Channel" }
+
+        // Fetch Discord's channel settings for the user
+        val guildSettings = fetchGuildSettings()
+        val hiddenChannels = mutableSetOf<String>()
+        var channelsObj: Map<*, *>? = null
+        if (guildSettings != null) {
+            val guildObj = (guildSettings["guilds"] as? Map<*, *>)?.get(guildId.toString()) as? Map<*, *>
+            channelsObj = guildObj?.get("channels") as? Map<*, *>
+            if (channelsObj != null) {
+                for ((cid, checked) in channelsObj) {
+                    if (checked == false) hiddenChannels.add(cid.toString())
+                }
+            }
         }
-        val unnamedCount = channelNames.count { it == "Unnamed Channel" }
-        val totalCount = channelNames.size
-        val threshold = 3
-        val mostlyUnnamed = totalCount > 0 && unnamedCount >= totalCount * 2 / 3
-        if (guildId == 0L) {
-            activity?.finish()
-            return
-        } else if (totalCount < threshold || mostlyUnnamed) {
-            linearLayout.removeAllViews()
-            return
-        }
+        // ...existing code...
 
         val categories = allChannels.values.filter {
             try { typeField.getInt(it) == 4 } catch (_: Throwable) { false }
@@ -92,88 +111,55 @@ class ChannelBrowserPage(val settings: SettingsAPI, val channels: MutableList<St
                 textSize = 15f
                 layoutParams = LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f)
             }
-
-            val categoryChildren = if (catId != null) channelsByCategory[catId] else null
-            val allFollowed = categoryChildren?.all { ch ->
-                val chName = try { nameField.get(ch) as? String ?: "Unnamed Channel" } catch (_: Throwable) { "Unnamed Channel" }
-                val channelKey = "$chName-$guildId"
-                channelKey !in channels
-            } ?: true
-
-            val followCb = CheckBox(ctx)
-            followCb.apply {
-                isChecked = allFollowed
-                text = ""
-                layoutParams = LinearLayout.LayoutParams(LinearLayout.LayoutParams.WRAP_CONTENT, LinearLayout.LayoutParams.WRAP_CONTENT)
-                var suppressListener = false
-                setOnCheckedChangeListener { buttonView, checked ->
-                    if (suppressListener) return@setOnCheckedChangeListener
-                    val previousState = !checked
-                    val doAction = {
-                        val children = if (catId != null) channelsByCategory[catId] else null
-                        if (children != null) {
-                            for (ch in children) {
-                                val chName = try { nameField.get(ch) as? String ?: "Unnamed Channel" } catch (_: Throwable) { "Unnamed Channel" }
-                                val channelKey = "$chName-$guildId"
-                                if (!checked) {
-                                    if (channelKey !in channels) channels += channelKey
-                                } else {
-                                    channels -= channelKey
-                                }
-                            }
-                            settings.setObject("channels", channels)
-                            linearLayout.removeAllViews()
-                            onViewBound(view)
-                        }
+            val children = if (catId != null) channelsByCategory[catId] else null
+            // Determine category checkbox state
+            val childIds = children?.mapNotNull { ch ->
+                try { ch.javaClass.getDeclaredField("id").apply { isAccessible = true }.get(ch)?.toString() } catch (_: Throwable) { null }
+            } ?: emptyList()
+            val checkedCount = childIds.count { id -> !hiddenChannels.contains(id) }
+            val allChecked = checkedCount == childIds.size && childIds.isNotEmpty()
+            val noneChecked = checkedCount == 0
+            val catCb = CheckBox(ctx)
+            catCb.isChecked = allChecked
+            // Indeterminate state (visual only)
+            if (!allChecked && !noneChecked) catCb.buttonDrawable?.alpha = 128 else catCb.buttonDrawable?.alpha = 255
+            catCb.layoutParams = LinearLayout.LayoutParams(LinearLayout.LayoutParams.WRAP_CONTENT, LinearLayout.LayoutParams.WRAP_CONTENT).apply {
+                gravity = Gravity.CENTER_VERTICAL
+            }
+            catCb.setOnCheckedChangeListener { _, checked ->
+                // PATCH all child channels
+                if (catId != null && children != null) {
+                    // Update local hiddenChannels set
+                    childIds.forEach { chId ->
+                        if (checked) hiddenChannels.remove(chId) else hiddenChannels.add(chId)
                     }
-                    if (settings.getBool("confirmActions", false)) {
-                        val textColorRes = R.c.primary_dark
-                        val textColor = ContextCompat.getColor(ctx, textColorRes)
-                        val customTitle = TextView(ctx).apply {
-                            text = if (!checked) "Unfollow Category" else "Follow Category"
-                            setTextColor(textColor)
-                            typeface = ResourcesCompat.getFont(ctx, Constants.Fonts.whitney_bold)
-                            textSize = 20f
-                            setPadding(32, 32, 32, 16)
-                        }
-                        val themedDialog = AlertDialog.Builder(ctx)
-                            .setCustomTitle(customTitle)
-                            .setMessage("Are you sure you want to ${if (!checked) "unfollow" else "follow"} this category?")
-                            .setPositiveButton("Yes") { _: android.content.DialogInterface, _: Int -> doAction() }
-                            .setNegativeButton("No") { dialog, _ ->
-                                suppressListener = true
-                                buttonView.isChecked = previousState
-                                suppressListener = false
-                                dialog.dismiss()
-                            }
-                            .setOnCancelListener {
-                                suppressListener = true
-                                buttonView.isChecked = previousState
-                                suppressListener = false
-                            }
-                            .create()
-                        themedDialog.show()
-                        themeAlertDialogText(themedDialog, ctx)
-                    } else {
-                        doAction()
+                    // Build PATCH map: only hidden channels as false
+                    val patchMap = hiddenChannels.associateWith { false }
+                    val patchBody = mapOf(
+                        "guild_id" to guildId,
+                        "channels" to patchMap
+                    )
+                    try {
+                        val req = com.aliucord.Http.Request.newDiscordRNRequest(
+                            "/users/@me/guilds/settings",
+                            "PATCH"
+                        )
+                        req.executeWithJson(patchBody)
+                    } catch (e: Exception) {
+                        e.printStackTrace()
+                    }
+                    // Refresh UI after PATCH with delay
+                    lastView?.let { v ->
+                        handler.postDelayed({ onViewBound(v) }, 200)
                     }
                 }
             }
-            val followLabel = TextView(ctx, null, 0, R.i.UiKit_Settings_Item_SubText).apply {
-                text = "Follow Category"
-                typeface = ResourcesCompat.getFont(ctx, Constants.Fonts.whitney_medium)
-                textSize = 13f
-                setPadding(8, 0, 0, 0)
-                gravity = Gravity.END or Gravity.CENTER_VERTICAL
-            }
             catRow.addView(catTv)
-            catRow.addView(followCb)
-            catRow.addView(followLabel)
+            catRow.addView(catCb)
             catRow.addTo(linearLayout)
-            val children = if (catId != null) channelsByCategory[catId] else null
             if (children != null) {
                 for (ch in children) {
-                    addChannelRowReflect(ch, guildId, ctx, nameField)
+                    addChannelRowReflect(ch, guildId, ctx, nameField, hiddenChannels, channelsObj, allChannels)
                 }
             }
         }
@@ -186,7 +172,7 @@ class ChannelBrowserPage(val settings: SettingsAPI, val channels: MutableList<St
                 setPadding(0, 24, 0, 8)
             }.addTo(linearLayout)
             for (ch in uncategorized) {
-                addChannelRowReflect(ch, guildId, ctx, nameField)
+                addChannelRowReflect(ch, guildId, ctx, nameField, hiddenChannels, channelsObj, allChannels)
             }
         }
     }
@@ -195,11 +181,18 @@ class ChannelBrowserPage(val settings: SettingsAPI, val channels: MutableList<St
         ch: com.discord.api.channel.Channel,
         guildId: Long,
         ctx: Context,
-        nameField: java.lang.reflect.Field
-    ) {
+        nameField: java.lang.reflect.Field,
+        hiddenChannels: MutableSet<String>,
+        channelsObj: Map<*, *>?,
+        allChannels: Map<Long, com.discord.api.channel.Channel>
+    )
+    {
         val chName = try { nameField.get(ch) as? String ?: "Unnamed Channel" } catch (_: Throwable) { "Unnamed Channel" }
         val channelKey = "$chName-$guildId"
-        val isNuked = channelKey in channels
+        val chId = try { ch.javaClass.getDeclaredField("id").apply { isAccessible = true }.get(ch)?.toString() } catch (_: Throwable) { null }
+        val isChecked = chId != null && !hiddenChannels.contains(chId)
+
+        var suppressChannelListener = BooleanArray(1) { false }
 
         val row = LinearLayout(ctx).apply {
             orientation = LinearLayout.HORIZONTAL
@@ -213,57 +206,74 @@ class ChannelBrowserPage(val settings: SettingsAPI, val channels: MutableList<St
             val colorRes = try { R.c.primary_dark } catch (_: Throwable) { android.R.color.black }
             val color = try { ContextCompat.getColor(ctx, colorRes) } catch (_: Throwable) { 0xFF000000.toInt() }
             setTextColor(color)
-            alpha = if (isNuked) 0.5f else 1.0f
+            alpha = if (!isChecked) 0.5f else 1.0f
             layoutParams = LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f)
         }
-        val cb = CheckBox(ctx).apply {
-            isChecked = !isNuked
-            layoutParams = LinearLayout.LayoutParams(LinearLayout.LayoutParams.WRAP_CONTENT, LinearLayout.LayoutParams.WRAP_CONTENT).apply {
-                gravity = Gravity.CENTER_VERTICAL
+        val cb = CheckBox(ctx)
+        cb.isChecked = isChecked
+        cb.layoutParams = LinearLayout.LayoutParams(LinearLayout.LayoutParams.WRAP_CONTENT, LinearLayout.LayoutParams.WRAP_CONTENT).apply {
+            gravity = Gravity.CENTER_VERTICAL
+        }
+        cb.setOnCheckedChangeListener { buttonView, checked ->
+            if (suppressChannelListener[0]) return@setOnCheckedChangeListener
+            val previousState = !checked
+            val doAction = {
+                // PATCH request to update Discord settings
+                if (chId != null) {
+                    // Update local hiddenChannels set
+                    if (checked) hiddenChannels.remove(chId) else hiddenChannels.add(chId)
+                    // Build PATCH map: only hidden channels as false
+                    val patchMap = hiddenChannels.associateWith { false }
+                    val patchBody = mapOf(
+                        "guild_id" to guildId,
+                        "channels" to patchMap
+                    )
+                    try {
+                        val req = com.aliucord.Http.Request.newDiscordRNRequest(
+                            "/users/@me/guilds/settings",
+                            "PATCH"
+                        )
+                        req.executeWithJson(patchBody)
+                    } catch (e: Exception) {
+                        e.printStackTrace()
+                    }
+                }
+                // Refresh UI after PATCH with delay
+                lastView?.let { v ->
+                    handler.postDelayed({ onViewBound(v) }, 200)
+                }
             }
-            val suppressListener = false
-            setOnCheckedChangeListener { buttonView, checked ->
-                if (suppressListener) return@setOnCheckedChangeListener
-                val previousState = !checked
-                val doAction = {
-                    if (!checked) {
-                        if (channelKey !in channels) channels += channelKey
-                    } else {
-                        channels -= channelKey
-                    }
-                    settings.setObject("channels", channels)
-                    row.alpha = if (!checked) 0.5f else 1.0f
+            if (settings.getBool("confirmActions", false)) {
+                val textColor = ContextCompat.getColor(ctx, R.c.primary_dark)
+                val customTitle = TextView(ctx).apply {
+                    text = if (!checked) "Hide Channel" else "Restore Channel"
+                    setTextColor(textColor)
+                    typeface = ResourcesCompat.getFont(ctx, Constants.Fonts.whitney_bold)
+                    textSize = 20f
+                    setPadding(32, 32, 32, 16)
                 }
-                if (settings.getBool("confirmActions", false)) {
-                    val textColor = ContextCompat.getColor(ctx, R.c.primary_dark)
-                    val customTitle = TextView(ctx).apply {
-                        text = if (!checked) "Hide Channel" else "Restore Channel"
-                        setTextColor(textColor)
-                        typeface = ResourcesCompat.getFont(ctx, Constants.Fonts.whitney_bold)
-                        textSize = 20f
-                        setPadding(32, 32, 32, 16)
+                val themedDialog = AlertDialog.Builder(ctx)
+                    .setCustomTitle(customTitle)
+                    .setMessage("Are you sure you want to ${if (!checked) "hide" else "restore"} this channel?")
+                    .setPositiveButton("Yes") { _: android.content.DialogInterface, _: Int -> doAction() }
+                    .setNegativeButton("No") { _: android.content.DialogInterface, _ ->
+                        suppressChannelListener[0] = true
+                        buttonView.isChecked = previousState
+                        suppressChannelListener[0] = false
                     }
-                    val themedDialog = AlertDialog.Builder(ctx)
-                        .setCustomTitle(customTitle)
-                        .setMessage("Are you sure you want to ${if (!checked) "hide" else "restore"} this channel?")
-                        .setPositiveButton("Yes") { _: android.content.DialogInterface, _: Int -> doAction() }
-                        .setNegativeButton("No") { _: android.content.DialogInterface, _ ->
-                            buttonView.isChecked = previousState
-                        }
-                        .setOnCancelListener {
-                            buttonView.isChecked = previousState
-                        }
-                        .create()
-                    themedDialog.show()
-                    themeAlertDialogText(themedDialog, ctx)
-                } else {
-                    doAction()
-                }
+                    .setOnCancelListener {
+                        buttonView.isChecked = previousState
+                    }
+                    .create()
+                themedDialog.show()
+                themeAlertDialogText(themedDialog, ctx)
+            } else {
+                doAction()
             }
         }
         row.addView(tv)
         row.addView(cb)
-        row.alpha = if (isNuked) 0.5f else 1.0f
+        row.alpha = if (!isChecked) 0.5f else 1.0f
         row.addTo(linearLayout)
     }
 
