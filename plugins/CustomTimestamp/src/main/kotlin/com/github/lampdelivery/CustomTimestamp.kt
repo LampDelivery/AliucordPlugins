@@ -99,13 +99,17 @@ class CustomTimestamp : Plugin() {
                     text = regex24.replace(text) { match ->
                         val hour = match.groupValues[1].toInt()
                         val minute = match.groupValues[2]
-                        val ampm = if (hour < 12) "AM" else "PM"
-                        val hour12 = when {
-                            hour == 0 -> 12
-                            hour > 12 -> hour - 12
-                            else -> hour
+                        if (text.contains("AM", ignoreCase = true) || text.contains("PM", ignoreCase = true)) {
+                            String.format("%d:%s", if (hour == 0) 12 else if (hour > 12) hour - 12 else hour, minute)
+                        } else {
+                            val ampm = if (hour < 12) "AM" else "PM"
+                            val hour12 = when {
+                                hour == 0 -> 12
+                                hour > 12 -> hour - 12
+                                else -> hour
+                            }
+                            String.format("%d:%s %s", hour12, minute, ampm)
                         }
-                        String.format("%d:%s %s", hour12, minute, ampm)
                     }
                 }
             }
