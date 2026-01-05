@@ -1,6 +1,6 @@
 # ChannelBrowserProto
 
-A protobuf variant of the ChannelBrowser Aliucord plugin.
+ChannelBrowser Aliucord plugin
 
 ## Setup
 - Requires protobuf codegen (see build.gradle.kts)
