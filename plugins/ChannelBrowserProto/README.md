@@ -17,4 +17,3 @@ Fetches a protobuf-encoded channel list from a remote server and parses it.
 
 ---
 
-**Note:** You must provide a real endpoint that returns protobuf-encoded data for the example to work.
