@@ -8,6 +8,9 @@ plugins {
     id("com.aliucord.plugin")
 }
 
+version = "0.1.0"
+description = "Manage your channel list from a menu, show/hide channels and follow/unfollow categories"
+
 android {
     compileSdk = 33
     defaultConfig {
