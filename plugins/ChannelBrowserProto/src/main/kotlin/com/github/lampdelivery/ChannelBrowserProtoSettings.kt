@@ -6,13 +6,13 @@ import com.aliucord.api.SettingsAPI
 import com.aliucord.fragments.SettingsPage
 import com.discord.views.CheckedSetting
 
-class ChannelBrowserSettings(private val settings: SettingsAPI) : SettingsPage() {
+class ChannelBrowserProtoSettings(private val settings: SettingsAPI) : SettingsPage() {
 
     override fun onViewBound(view: View) {
         super.onViewBound(view)
 
         setActionBarTitle("Channel Browser Settings")
-        setActionBarSubtitle("Customize behaviour")
+        setActionBarSubtitle(null) 
         val ctx = requireContext()
 
         addView(

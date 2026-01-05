@@ -36,22 +36,22 @@ class CustomTimestampSettings(private val settings: SettingsAPI) : SettingsPage(
         super.onViewBound(view)
         val todayReplacement = settings.getString("todayReplacement", "")
         val formatOptions = listOf(
-            "MMM dd, yyyy",
-            "yyyy-MM-dd",
-            "yyyy/MM/dd",
-            "dd-MM-yyyy",
-            "yy/MM/dd",
-            "dd-MM-yy",
-            "MM/dd/yyyy",
-            "dd MMM yyyy"
+            "MMM dd, yyyy",         // Mon DD, YYYY (Default)
+            "yyyy-MM-dd",           // YYYY-MM-DD (Numerical)
+            "yyyy/MM/dd",           // YYYY/MM/DD
+            "dd-MM-yyyy",           // DD-MM-YYYY
+            "yy/MM/dd",             // YY/MM/DD (two-digit year)
+            "dd-MM-yy",             // DD-MM-YY (two-digit year)
+            "MM/dd/yyyy",           // MM/DD/YYYY
+            "dd MMM yyyy"           // DD Mon YYYY
         )
         val formatLabels = listOf(
             "Mon DD, YYYY (Default)",
             "YYYY-MM-DD (Numerical)",
             "YYYY/MM/DD",
             "DD-MM-YYYY",
-            "YY/MM/DD",
-            "DD-MM-YY",
+            "YY/MM/DD (two-digit year)",
+            "DD-MM-YY (two-digit year)",
             "MM/DD/YYYY",
             "DD Mon YYYY"
         )

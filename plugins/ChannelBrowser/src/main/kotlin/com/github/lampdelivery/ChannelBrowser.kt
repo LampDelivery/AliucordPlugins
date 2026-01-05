@@ -13,27 +13,20 @@ import androidx.core.content.res.ResourcesCompat
 import com.aliucord.Constants
 import com.aliucord.Utils
 import com.aliucord.annotations.AliucordPlugin
-import com.aliucord.api.SettingsAPI
 import com.aliucord.entities.Plugin
 import com.aliucord.patcher.*
-import com.aliucord.settings.delegate
-import com.aliucord.utils.MDUtils
 import com.aliucord.utils.ReflectUtils
-import com.aliucord.utils.ViewUtils.addTo
-import com.aliucord.wrappers.ChannelWrapper.Companion.name
 import com.discord.widgets.channels.list.`WidgetChannelListModel$Companion$guildListBuilder$$inlined$forEach$lambda$3`
 import com.discord.widgets.guilds.profile.WidgetGuildProfileSheet
 import com.aliucord.utils.ViewUtils.findViewById
 import com.discord.databinding.WidgetGuildProfileSheetBinding
 import com.discord.widgets.guilds.profile.WidgetGuildProfileSheetViewModel
 import com.lytefast.flexinput.R
-import androidx.recyclerview.widget.ConcatAdapter
 import androidx.recyclerview.widget.RecyclerView
 
 
 @AliucordPlugin
 class ChannelBrowser : Plugin() {
-    private var SettingsAPI.channels by settings.delegate(mutableListOf<String>())
 
     override fun start(context: Context) {
         settingsTab = SettingsTab(ChannelBrowserSettings::class.java).withArgs(settings)
@@ -43,14 +36,18 @@ class ChannelBrowser : Plugin() {
                 val idField = channel.javaClass.getDeclaredField("id")
                 idField.isAccessible = true
                 idField.get(channel) as? Long
-            } catch (_: Throwable) { null }
+            } catch (_: Throwable) {
+                null
+            }
             val hiddenChannels = settings.getObject("hiddenChannels", mutableListOf<String>()) as MutableList<String>
             if (channelId != null && hiddenChannels.contains(channelId.toString())) {
                 it.result = null
             }
         }
-        patcher.after<WidgetGuildProfileSheet>("configureTabItems", Long::class.java,
-            WidgetGuildProfileSheetViewModel.TabItems::class.java, Boolean::class.java) {
+        patcher.after<WidgetGuildProfileSheet>(
+            "configureTabItems", Long::class.java,
+            WidgetGuildProfileSheetViewModel.TabItems::class.java, Boolean::class.java
+        ) {
             val bindingMethod = ReflectUtils.getMethodByArgs(WidgetGuildProfileSheet::class.java, "getBinding")
             val binding = bindingMethod.invoke(this) as WidgetGuildProfileSheetBinding
 
@@ -62,13 +59,14 @@ class ChannelBrowser : Plugin() {
                 val v = lay.getChildAt(it)
                 v is TextView && v.text?.toString()?.contains("Browse Channels") == true
             }
-            val alreadyHasSettings = (0 until lay.childCount).any {
-                val v = lay.getChildAt(it)
-                v is TextView && v.text?.toString()?.contains("Channel Browser Settings") == true
-            }
             if (!alreadyHasBrowse) {
-                val changeNicknameId = lay.context.resources.getIdentifier("guild_profile_sheet_change_nickname", "id", lay.context.packageName)
-                val changeIdentityId = lay.context.resources.getIdentifier("change_identity", "id", lay.context.packageName)
+                val changeNicknameId = lay.context.resources.getIdentifier(
+                    "guild_profile_sheet_change_nickname",
+                    "id",
+                    lay.context.packageName
+                )
+                val changeIdentityId =
+                    lay.context.resources.getIdentifier("change_identity", "id", lay.context.packageName)
                 val changeNicknameView = lay.findViewById<View?>(changeNicknameId)
                 val changeIdentityView = lay.findViewById<View?>(changeIdentityId)
                 val insertIndex = when {
@@ -85,16 +83,19 @@ class ChannelBrowser : Plugin() {
                     text = "Browse Channels"
                     textSize = 16f
                     gravity = android.view.Gravity.CENTER_VERTICAL
-                    layoutParams = LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT)
+                    layoutParams = LinearLayout.LayoutParams(
+                        LinearLayout.LayoutParams.MATCH_PARENT,
+                        LinearLayout.LayoutParams.WRAP_CONTENT
+                    )
                     setOnClickListener {
-                        Utils.openPageWithProxy(lay.context, ChannelBrowserPage(settings, settings.channels))
+                        Utils.openPageWithProxy(lay.context, ChannelBrowserPage(settings))
                     }
                 }
                 lay.addView(browseTv, insertIndex)
             }
         }
     }
-    
+
     private class ChannelBrowserHeaderAdapter(
         val onClick: () -> Unit
     ) : RecyclerView.Adapter<ChannelBrowserHeaderAdapter.VH>() {
@@ -129,12 +130,17 @@ class ChannelBrowser : Plugin() {
             val textLeftMargin = 0
 
             val icon = ImageView(ctx).apply {
-                val resId = try { R.e.ic_menu_24dp } catch (_: Throwable) { android.R.drawable.ic_menu_sort_by_size }
+                val resId = try {
+                    R.e.ic_menu_24dp
+                } catch (_: Throwable) {
+                    android.R.drawable.ic_menu_sort_by_size
+                }
                 val drawable = androidx.core.content.ContextCompat.getDrawable(ctx, resId)?.mutate()
                 try {
                     val color = ColorCompat.getThemedColor(ctx, R.b.colorInteractiveNormal)
                     drawable?.setTint(color)
-                } catch (_: Throwable) {}
+                } catch (_: Throwable) {
+                }
                 setImageDrawable(drawable)
                 val size = (24 * scale).toInt()
                 layoutParams = LinearLayout.LayoutParams(size, size).apply {
@@ -146,14 +152,25 @@ class ChannelBrowser : Plugin() {
             row.addView(icon)
 
             val tv = TextView(ctx, null, 0, R.i.UiKit_Settings_Item).apply {
-                setText("Browse Channels")
+                text = "Browse Channels"
                 typeface = ResourcesCompat.getFont(ctx, Constants.Fonts.whitney_medium)
                 textSize = 16f
-                val colorRes = try { R.c.primary_dark } catch (_: Throwable) { android.R.color.black }
-                val color = try { androidx.core.content.ContextCompat.getColor(ctx, colorRes) } catch (_: Throwable) { 0xFF000000.toInt() }
+                val colorRes = try {
+                    R.c.primary_dark
+                } catch (_: Throwable) {
+                    android.R.color.black
+                }
+                val color = try {
+                    androidx.core.content.ContextCompat.getColor(ctx, colorRes)
+                } catch (_: Throwable) {
+                    0xFF000000.toInt()
+                }
                 setTextColor(color)
                 gravity = android.view.Gravity.CENTER_VERTICAL
-                layoutParams = LinearLayout.LayoutParams(LinearLayout.LayoutParams.WRAP_CONTENT, LinearLayout.LayoutParams.WRAP_CONTENT).apply {
+                layoutParams = LinearLayout.LayoutParams(
+                    LinearLayout.LayoutParams.WRAP_CONTENT,
+                    LinearLayout.LayoutParams.WRAP_CONTENT
+                ).apply {
                     leftMargin = textLeftMargin
                 }
                 setPadding(0, 0, 0, 0)

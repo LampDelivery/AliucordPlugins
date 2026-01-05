@@ -12,7 +12,7 @@ class ChannelBrowserSettings(private val settings: SettingsAPI) : SettingsPage()
         super.onViewBound(view)
 
         setActionBarTitle("Channel Browser Settings")
-        setActionBarSubtitle("Customize behaviour")
+        setActionBarSubtitle(null)
         val ctx = requireContext()
 
         addView(
@@ -25,6 +25,20 @@ class ChannelBrowserSettings(private val settings: SettingsAPI) : SettingsPage()
                 isChecked = settings.getBool("confirmActions", false)
                 setOnCheckedListener {
                     settings.setBool("confirmActions", it)
+                }
+            }
+        )
+
+        addView(
+            Utils.createCheckedSetting(
+                ctx,
+                CheckedSetting.ViewType.SWITCH,
+                "Sync to PC/RN",
+                "Enable syncing channel visibility to Discord PC/React Native. Disabling this keeps changes local only."
+            ).apply {
+                isChecked = settings.getBool("syncToPC", true)
+                setOnCheckedListener {
+                    settings.setBool("syncToPC", it)
                 }
             }
         )

@@ -1,0 +1,21 @@
+syntax = "proto3";
+
+package channelbrowser;
+
+message ChannelOverride {
+  string channel_id = 1;
+  int32 flags = 2;
+}
+
+message GuildSettings {
+  string guild_id = 1;
+  repeated ChannelOverride channel_overrides = 2;
+}
+
+message UserSettings {
+  repeated GuildSettings guilds = 1;
+}
+
+message SettingsUpdateEvent {
+  UserSettings settings = 1;
+}

@@ -15,39 +15,18 @@ import com.lytefast.flexinput.R
 import com.aliucord.fragments.SettingsPage
 import com.discord.stores.StoreStream
 
-class ChannelBrowserPage(val settings: SettingsAPI, val channels: MutableList<String>) : SettingsPage() {
+class ChannelBrowserPage(val settings: SettingsAPI) : SettingsPage() {
     private val logger = com.aliucord.Logger("ChannelBrowser")
     private val handler = android.os.Handler(android.os.Looper.getMainLooper())
     private var lastView: View? = null
-    private fun deepCopyOverrides(orig: Any?): MutableList<MutableMap<String, Any>> {
-        val result = mutableListOf<MutableMap<String, Any>>()
-        if (orig is List<*>) {
-            for (item in orig) {
-                if (item is Map<*, *>) {
-                    val map = HashMap<String, Any>()
-                    for ((k, v) in item) {
-                        if (k is String && v != null) {
-                            map[k] = v
-                        }
-                    }
-                    result.add(map)
-                }
-            }
-        }
-        return result
-    }
     private fun getCurrentGuildSettings(guildId: Long): Map<String, Any>? {
         return try {
-            val store = com.discord.stores.StoreStream.getUserGuildSettings()
-            val settingsMap = store.getGuildSettings() 
-            val settings = settingsMap[guildId]
-            if (settings == null) return null
+            val store = StoreStream.getUserGuildSettings()
+            val settingsMap = store.guildSettings
+            val settings = settingsMap[guildId] ?: return null
             val field = settings.javaClass.declaredFields.find { it.name == "channelOverrides" }
             field?.isAccessible = true
-            val overridesList = field?.get(settings) as? List<*>
-            if (overridesList == null) {
-                return null
-            }
+            val overridesList = field?.get(settings) as? List<*> ?: return null
             val overridesMap = mutableMapOf<String, Int>()
             for (override in overridesList) {
                 if (override == null) continue
@@ -65,6 +44,7 @@ class ChannelBrowserPage(val settings: SettingsAPI, val channels: MutableList<St
             null
         }
     }
+
     private fun themeAlertDialogText(dialog: AlertDialog, ctx: Context) {
         try {
             val textColorRes = R.c.primary_dark
@@ -75,21 +55,22 @@ class ChannelBrowserPage(val settings: SettingsAPI, val channels: MutableList<St
                 messageView?.setTextColor(textColor)
                 messageView?.setTypeface(ResourcesCompat.getFont(ctx, Constants.Fonts.whitney_medium))
             }
-        } catch (_: Throwable) {}
+        } catch (_: Throwable) {
+        }
     }
+
     @SuppressLint("SetTextI18n")
     override fun onViewBound(view: View) {
         lastView = view
         super.onViewBound(view)
 
         setActionBarTitle("Browse Channels")
-        setActionBarSubtitle(null) 
+        setActionBarSubtitle(null)
 
         val ctx = context ?: return
         val guildId = StoreStream.getGuildSelected().selectedGuildId
         val allChannelsRaw = StoreStream.getChannels().getChannelsForGuild(guildId)
         val hiddenChannels = settings.getObject("hiddenChannels", mutableListOf<String>()) as MutableList<String>
-        val allChannels = allChannelsRaw
 
         val guildSettings = getCurrentGuildSettings(guildId)
         logger.debug("[getCurrentGuildSettings] raw result: $guildSettings")
@@ -97,17 +78,22 @@ class ChannelBrowserPage(val settings: SettingsAPI, val channels: MutableList<St
         val channelOverridesMap = if (channelOverrides is Map<*, *>) {
             channelOverrides.entries.filter { it.key is String && it.value is Int }
                 .associate { it.key as String to it.value as Int }
-        } else emptyMap<String, Int>()
+        } else emptyMap()
         logger.debug("[getCurrentGuildSettings] channelOverridesMap=$channelOverridesMap")
 
         try {
-            val store = com.discord.stores.StoreStream.getUserGuildSettings()
+            val store = StoreStream.getUserGuildSettings()
             com.discord.utilities.rx.ObservableExtensionsKt.appSubscribe(
                 store.observeGuildSettings(guildId),
                 ChannelBrowserPage::class.java,
                 ctx,
                 { logger.debug("[observeGuildSettings] onSubscribe") },
-                { error: com.discord.utilities.error.Error -> logger.error("[observeGuildSettings] error", error as? Exception ?: Exception(error.toString())) },
+                { error: com.discord.utilities.error.Error ->
+                    logger.error(
+                        "[observeGuildSettings] error",
+                        error as? Exception ?: Exception(error.toString())
+                    )
+                },
                 { logger.debug("[observeGuildSettings] onComplete") },
                 { logger.debug("[observeGuildSettings] onTerminate") },
                 { _: Any? -> logger.debug("[observeGuildSettings] Guild settings updated!") }
@@ -115,17 +101,23 @@ class ChannelBrowserPage(val settings: SettingsAPI, val channels: MutableList<St
         } catch (e: Throwable) {
             logger.error("[observeGuildSettings] Exception", e)
         }
-        val typeField = com.discord.api.channel.Channel::class.java.getDeclaredField("type").apply { isAccessible = true }
-        val parentIdField = com.discord.api.channel.Channel::class.java.getDeclaredField("parentId").apply { isAccessible = true }
+        val typeField =
+            com.discord.api.channel.Channel::class.java.getDeclaredField("type").apply { isAccessible = true }
+        val parentIdField =
+            com.discord.api.channel.Channel::class.java.getDeclaredField("parentId").apply { isAccessible = true }
         val idField = com.discord.api.channel.Channel::class.java.getDeclaredField("id").apply { isAccessible = true }
-        val nameField = com.discord.api.channel.Channel::class.java.getDeclaredField("name").apply { isAccessible = true }
+        val nameField =
+            com.discord.api.channel.Channel::class.java.getDeclaredField("name").apply { isAccessible = true }
         val linearLayout = LinearLayout(ctx).apply {
             orientation = LinearLayout.VERTICAL
-            layoutParams = LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT)
+            layoutParams = LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.MATCH_PARENT,
+                LinearLayout.LayoutParams.WRAP_CONTENT
+            )
         }
         addView(linearLayout)
 
-        val categories = allChannels.values.filter {
+        val categories = allChannelsRaw.values.filter {
             try {
                 typeField.getInt(it) == 4
             } catch (_: Throwable) {
@@ -135,7 +127,7 @@ class ChannelBrowserPage(val settings: SettingsAPI, val channels: MutableList<St
         val channelsByCategory = mutableMapOf<Long, MutableList<com.discord.api.channel.Channel>>()
         val uncategorized = mutableListOf<com.discord.api.channel.Channel>()
 
-        for (ch in allChannels.values) {
+        for (ch in allChannelsRaw.values) {
             val type = try {
                 typeField.getInt(ch)
             } catch (_: Throwable) {
@@ -147,7 +139,7 @@ class ChannelBrowserPage(val settings: SettingsAPI, val channels: MutableList<St
             } catch (_: Throwable) {
                 null
             }
-            if (parentId != null && allChannels.containsKey(parentId)) {
+            if (parentId != null && allChannelsRaw.containsKey(parentId)) {
                 channelsByCategory.getOrPut(parentId) { mutableListOf() }.add(ch)
             } else {
                 uncategorized.add(ch)
@@ -179,8 +171,10 @@ class ChannelBrowserPage(val settings: SettingsAPI, val channels: MutableList<St
             val followLabel = TextView(ctx, null, 0, R.i.UiKit_Settings_Item).apply {
                 text = "Follow Category"
                 val color = try {
-                    com.discord.utilities.color.ColorCompat.getThemedColor(ctx, com.lytefast.flexinput.R.b.colorInteractiveNormal)
-                } catch (_: Throwable) { 0xFF222222.toInt() }
+                    com.discord.utilities.color.ColorCompat.getThemedColor(ctx, R.b.colorInteractiveNormal)
+                } catch (_: Throwable) {
+                    0xFF222222.toInt()
+                }
                 setTextColor(color)
                 typeface = ResourcesCompat.getFont(ctx, Constants.Fonts.whitney_medium)
                 textSize = 14f
@@ -200,20 +194,25 @@ class ChannelBrowserPage(val settings: SettingsAPI, val channels: MutableList<St
                 (flags and 4096) != 0
             }
             val allChecked = checkedCount == childIds.size && childIds.isNotEmpty()
-            val noneChecked = checkedCount == 0
             val catToggle = Switch(ctx)
             catToggle.isChecked = !isCategoryHiddenLocally && allChecked
-            catToggle.layoutParams = LinearLayout.LayoutParams(LinearLayout.LayoutParams.WRAP_CONTENT, LinearLayout.LayoutParams.WRAP_CONTENT).apply {
+            catToggle.layoutParams = LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.WRAP_CONTENT,
+                LinearLayout.LayoutParams.WRAP_CONTENT
+            ).apply {
                 gravity = Gravity.CENTER_VERTICAL
             }
             catToggle.setOnCheckedChangeListener { _, checked ->
                 if (catId != null) {
                     catToggle.isEnabled = false
+                    catToggle.isChecked = checked
                     Thread {
                         val newOverridesMap = mutableMapOf<String, MutableMap<String, Any>>()
-                        newOverridesMap[catId.toString()] = mutableMapOf("channel_id" to catId.toString(), "flags" to if (checked) 4096 else 0)
-                        val localHidden = settings.getObject("hiddenChannels", mutableListOf<String>()) as MutableList<String>
-                        val prevHiddenKey = "catPrevHidden_${catId.toString()}"
+                        newOverridesMap[catId.toString()] =
+                            mutableMapOf("channel_id" to catId.toString(), "flags" to if (checked) 4096 else 0)
+                        val localHidden =
+                            settings.getObject("hiddenChannels", mutableListOf<String>()) as MutableList<String>
+                        val prevHiddenKey = "catPrevHidden_$catId"
                         if (checked) {
                             val prevHidden = childIds.filter { localHidden.contains(it) }
                             settings.setObject(prevHiddenKey, prevHidden)
@@ -222,7 +221,8 @@ class ChannelBrowserPage(val settings: SettingsAPI, val channels: MutableList<St
                             }
                             localHidden.remove(catId.toString())
                         } else {
-                            val prevHidden = settings.getObject(prevHiddenKey, mutableListOf<String>()) as MutableList<String>
+                            val prevHidden =
+                                settings.getObject(prevHiddenKey, mutableListOf<String>()) as MutableList<String>
                             for (chId in childIds) {
                                 if (prevHidden.contains(chId)) {
                                     if (!localHidden.contains(chId)) localHidden.add(chId)
@@ -233,28 +233,38 @@ class ChannelBrowserPage(val settings: SettingsAPI, val channels: MutableList<St
                             if (!localHidden.contains(catId.toString())) localHidden.add(catId.toString())
                         }
                         settings.setObject("hiddenChannels", localHidden)
-                        val patchBody = mapOf(
-                            "guilds" to mapOf(
-                                guildId.toString() to mapOf(
-                                    "channel_overrides" to newOverridesMap
+                        val syncToPC = settings.getBool("syncToPC", true)
+                        if (syncToPC) {
+                            val patchBody = mapOf(
+                                "guilds" to mapOf(
+                                    guildId.toString() to mapOf(
+                                        "channel_overrides" to newOverridesMap
+                                    )
                                 )
                             )
-                        )
-                        try {
-                            logger.debug("PATCH (category) body: $patchBody")
-                            val req = com.aliucord.Http.Request.newDiscordRNRequest(
-                                "/users/@me/guilds/settings",
-                                "PATCH"
-                            )
-                            val resp = req.executeWithJson(patchBody)
-                            logger.debug("PATCH (category) response: ${resp.text()}")
-                        } catch (e: Exception) {
-                            logger.error("PATCH (category) error", e)
+                            try {
+                                logger.debug("PATCH (category) body: $patchBody")
+                                val req = Http.Request.newDiscordRNRequest(
+                                    "/users/@me/guilds/settings",
+                                    "PATCH"
+                                )
+                                val resp = req.executeWithJson(patchBody)
+                                logger.debug("PATCH (category) response: ${resp.text()}")
+                            } catch (e: Exception) {
+                                logger.error("PATCH (category) error", e)
+                            }
                         }
                         lastView?.let { v ->
-                            handler.post {
-                                catToggle.isEnabled = true
-                                onViewBound(v)
+                            if (syncToPC) {
+                                handler.post {
+                                    catToggle.isEnabled = true
+                                    onViewBound(v)
+                                }
+                            } else {
+                                handler.postDelayed({
+                                    catToggle.isEnabled = true
+                                    onViewBound(v)
+                                }, 250)
                             }
                         }
                     }.start()
@@ -270,7 +280,7 @@ class ChannelBrowserPage(val settings: SettingsAPI, val channels: MutableList<St
                 for (ch in children) {
                     addChannelRowReflect(
                         ch, guildId, ctx, nameField,
-                        channelOverridesMap, linearLayout, allChannelsRaw, false, isCategoryFollowed, hiddenChannels
+                        channelOverridesMap, linearLayout, false, isCategoryFollowed, hiddenChannels
                     )
                 }
             }
@@ -285,8 +295,15 @@ class ChannelBrowserPage(val settings: SettingsAPI, val channels: MutableList<St
             }.let { linearLayout.addView(it) }
             for (ch in uncategorized) {
                 addChannelRowReflect(
-                    ch, guildId, ctx, nameField,
-                    channelOverridesMap, linearLayout, allChannelsRaw, false, false, hiddenChannels
+                    ch,
+                    guildId,
+                    ctx,
+                    nameField,
+                    channelOverridesMap,
+                    linearLayout,
+                    grayOut = false,
+                    parentCategoryHidden = false,
+                    hiddenChannels = hiddenChannels
                 )
             }
         }
@@ -299,7 +316,6 @@ class ChannelBrowserPage(val settings: SettingsAPI, val channels: MutableList<St
         nameField: java.lang.reflect.Field,
         channelOverridesMap: Map<String, Int>,
         linearLayout: LinearLayout,
-        allChannelsRaw: Map<Long, com.discord.api.channel.Channel>,
         grayOut: Boolean = false,
         parentCategoryHidden: Boolean = false,
         hiddenChannels: MutableList<String>
@@ -314,11 +330,11 @@ class ChannelBrowserPage(val settings: SettingsAPI, val channels: MutableList<St
         } catch (_: Throwable) {
             null
         }
-            val flags = if (chId != null) channelOverridesMap[chId] ?: 4096 else 4096
-            val isHiddenLocally = hiddenChannels.contains(chId)
-            val isCheckedRemote = (flags and 4096) != 0
-            val isChecked = !isHiddenLocally && isCheckedRemote
-        var suppressChannelListener = BooleanArray(1) { false }
+        val flags = if (chId != null) channelOverridesMap[chId] ?: 4096 else 4096
+        val isHiddenLocally = hiddenChannels.contains(chId)
+        val isCheckedRemote = (flags and 4096) != 0
+        val isChecked = !isHiddenLocally && isCheckedRemote
+        val suppressChannelListener = BooleanArray(1) { false }
 
         val row = LinearLayout(ctx).apply {
             orientation = LinearLayout.HORIZONTAL
@@ -344,9 +360,9 @@ class ChannelBrowserPage(val settings: SettingsAPI, val channels: MutableList<St
             textSize = 14f
             val color = try {
                 if (isChecked) {
-                    com.discord.utilities.color.ColorCompat.getThemedColor(ctx, com.lytefast.flexinput.R.b.colorInteractiveMuted)
+                    com.discord.utilities.color.ColorCompat.getThemedColor(ctx, R.b.colorInteractiveMuted)
                 } else {
-                    com.discord.utilities.color.ColorCompat.getThemedColor(ctx, com.lytefast.flexinput.R.b.colorInteractiveNormal)
+                    com.discord.utilities.color.ColorCompat.getThemedColor(ctx, R.b.colorInteractiveNormal)
                 }
             } catch (_: Throwable) {
                 if (isChecked) 0xFF222222.toInt() else 0xFF888888.toInt()
@@ -357,48 +373,52 @@ class ChannelBrowserPage(val settings: SettingsAPI, val channels: MutableList<St
         val cb = CheckBox(ctx)
         cb.isChecked = isChecked
         cb.isEnabled = !parentCategoryHidden
-        cb.layoutParams = LinearLayout.LayoutParams(LinearLayout.LayoutParams.WRAP_CONTENT, LinearLayout.LayoutParams.WRAP_CONTENT).apply {
-            gravity = Gravity.CENTER_VERTICAL
-        }
+        cb.layoutParams =
+            LinearLayout.LayoutParams(LinearLayout.LayoutParams.WRAP_CONTENT, LinearLayout.LayoutParams.WRAP_CONTENT)
+                .apply {
+                    gravity = Gravity.CENTER_VERTICAL
+                }
         cb.setOnCheckedChangeListener { buttonView, checked ->
             if (suppressChannelListener[0]) return@setOnCheckedChangeListener
             val previousState = !checked
+            cb.isChecked = checked
+            row.alpha = if (!checked || parentCategoryHidden) 0.5f else 1.0f
             val doAction = {
                 if (chId != null) {
                     suppressChannelListener[0] = true
                     Thread {
                         val channelOverrides = mutableMapOf<String, MutableMap<String, Any>>()
-                        val toggledOverride = mutableMapOf<String, Any>("channel_id" to chId!!, "flags" to if (checked) 4096 else 0)
-                        channelOverrides[chId!!] = toggledOverride
+                        val toggledOverride =
+                            mutableMapOf<String, Any>("channel_id" to chId, "flags" to if (checked) 4096 else 0)
+                        channelOverrides[chId] = toggledOverride
                         if (!checked) {
-                            if (!hiddenChannels.contains(chId)) hiddenChannels.add(chId!!)
+                            if (!hiddenChannels.contains(chId)) hiddenChannels.add(chId)
                         } else {
                             hiddenChannels.remove(chId)
                         }
                         settings.setObject("hiddenChannels", hiddenChannels)
-                        val patchBody = mapOf(
-                            "guilds" to mapOf(
-                                guildId.toString() to mapOf(
-                                    "channel_overrides" to channelOverrides
+                        if (settings.getBool("syncToPC", true)) {
+                            val patchBody = mapOf(
+                                "guilds" to mapOf(
+                                    guildId.toString() to mapOf(
+                                        "channel_overrides" to channelOverrides
+                                    )
                                 )
                             )
-                        )
-                        try {
-                            logger.debug("PATCH body: $patchBody")
-                            val req = Http.Request.newDiscordRNRequest(
-                                "/users/@me/guilds/settings",
-                                "PATCH"
-                            )
-                            val resp = req.executeWithJson(patchBody)
-                            logger.debug("PATCH response: ${resp.text()}")
-                            handler.post {
-                                cb.isChecked = checked
-                                row.alpha = if (!checked || parentCategoryHidden) 0.5f else 1.0f
-                                suppressChannelListener[0] = false
+                            try {
+                                logger.debug("PATCH body: $patchBody")
+                                val req = Http.Request.newDiscordRNRequest(
+                                    "/users/@me/guilds/settings",
+                                    "PATCH"
+                                )
+                                val resp = req.executeWithJson(patchBody)
+                                logger.debug("PATCH response: ${resp.text()}")
+                            } catch (e: Exception) {
+                                logger.error("PATCH error", e)
                             }
-                        } catch (e: Exception) {
-                            logger.error("PATCH error", e)
-                            handler.post { suppressChannelListener[0] = false }
+                        }
+                        handler.post {
+                            suppressChannelListener[0] = false
                         }
                     }.start()
                 }
