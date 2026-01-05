@@ -16,10 +16,7 @@ Configure the message timestamps
 ## ChannelBrowser (BETA)
 Manage your channel list from a menu sheet, show/hide channels and follow/unfollow categories
 
-## ChannelBrowserProto
-- Requires protobuf codegen (see build.gradle.kts)
-- Place your .proto files in `src/main/proto/`
-- Example usage in `ChannelBrowserProto.kt`
+
 
 
 
