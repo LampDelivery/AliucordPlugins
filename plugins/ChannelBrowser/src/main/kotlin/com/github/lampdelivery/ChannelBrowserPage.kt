@@ -18,6 +18,7 @@ class ChannelBrowserPage(val settings: SettingsAPI, val channels: MutableList<St
     private val logger = com.aliucord.Logger("ChannelBrowser")
     private val handler = android.os.Handler(android.os.Looper.getMainLooper())
     private var lastView: View? = null
+    private var gatewayListener: ((String, Any?) -> Unit)? = null
     private fun deepCopyOverrides(orig: Any?): MutableList<MutableMap<String, Any>> {
         val result = mutableListOf<MutableMap<String, Any>>()
         if (orig is List<*>) {
@@ -35,33 +36,34 @@ class ChannelBrowserPage(val settings: SettingsAPI, val channels: MutableList<St
         }
         return result
     }
-    private fun fetchGuildSettings(): Map<String, Any>? {
-        val guildId = StoreStream.getGuildSelected().selectedGuildId
-        var result: Map<String, Any>? = null
-        val latch = java.util.concurrent.CountDownLatch(1)
-        Thread {
-            try {
-                val req = com.aliucord.Http.Request.newDiscordRNRequest(
-                    "/users/@me/guilds/$guildId/settings",
-                    "GET"
-                )
-                val res = req.execute()
-                val resp = res.text()
-                logger.debug("fetchGuildSettings: resp=$resp")
-                if (resp != null && resp.trim().startsWith("{")) {
-                    @Suppress("UNCHECKED_CAST")
-                    result = com.google.gson.Gson().fromJson(resp, Map::class.java) as? Map<String, Any>
-                } else {
-                    logger.error("fetchGuildSettings: Invalid or empty response: $resp", null)
-                }
-            } catch (e: Exception) {
-                logger.error("fetchGuildSettings error", e)
-            } finally {
-                latch.countDown()
+    private fun getCurrentGuildSettings(guildId: Long): Map<String, Any>? {
+        return try {
+            val store = com.discord.stores.StoreStream.getUserGuildSettings()
+            val settingsMap = store.getGuildSettings() 
+            val settings = settingsMap[guildId]
+            if (settings == null) return null
+            val field = settings.javaClass.declaredFields.find { it.name == "channelOverrides" }
+            field?.isAccessible = true
+            val overridesList = field?.get(settings) as? List<*>
+            if (overridesList == null) {
+                return null
             }
-        }.start()
-        latch.await()
-        return result
+            val overridesMap = mutableMapOf<String, Int>()
+            for (override in overridesList) {
+                if (override == null) continue
+                val chIdField = override.javaClass.declaredFields.find { it.name == "channelId" }
+                val flagsField = override.javaClass.declaredFields.find { it.name == "flags" }
+                chIdField?.isAccessible = true
+                flagsField?.isAccessible = true
+                val chId = chIdField?.get(override)?.toString()
+                val flags = (flagsField?.get(override) as? Int) ?: 0
+                if (chId != null) overridesMap[chId] = flags
+            }
+            mapOf("channel_overrides" to overridesMap)
+        } catch (e: Throwable) {
+            logger.error("[getCurrentGuildSettings] Exception: ${e.message}", e)
+            null
+        }
     }
     private fun themeAlertDialogText(dialog: AlertDialog, ctx: Context) {
         try {
@@ -75,30 +77,64 @@ class ChannelBrowserPage(val settings: SettingsAPI, val channels: MutableList<St
             }
         } catch (_: Throwable) {}
     }
-
     @SuppressLint("SetTextI18n")
     override fun onViewBound(view: View) {
         lastView = view
         super.onViewBound(view)
 
-        setActionBarTitle("Channel Browser")
-        setActionBarSubtitle("Manage Channels")
+        if (gatewayListener == null) {
+            gatewayListener = { eventName, data ->
+                logger.debug("[GatewayListener] Event: $eventName, Data: $data")
+                if (eventName == "USER_GUILD_SETTINGS_UPDATE") {
+                    logger.debug("[GatewayListener] USER_GUILD_SETTINGS_UPDATE received, refreshing UI")
+                    lastView?.let { v ->
+                        handler.post { onViewBound(v) }
+                    }
+                }
+            }
+            try {
+                val storeGateway = Class.forName("com.discord.stores.StoreGatewayConnection").getDeclaredField("INSTANCE").get(null)
+                val addListener = storeGateway.javaClass.getMethod("addEventListener", String::class.java, java.util.function.BiConsumer::class.java)
+                addListener.invoke(storeGateway, "USER_GUILD_SETTINGS_UPDATE", java.util.function.BiConsumer<String, Any?> { event, data -> gatewayListener?.invoke(event, data) })
+                logger.debug("Registered USER_GUILD_SETTINGS_UPDATE gateway listener")
+            } catch (e: Exception) {
+                logger.error("Failed to register gateway listener", e)
+            }
+        }
+
+        setActionBarTitle("Browse Channels")
+        setActionBarSubtitle(null) 
 
         val ctx = context ?: return
         val guildId = StoreStream.getGuildSelected().selectedGuildId
         val allChannelsRaw = StoreStream.getChannels().getChannelsForGuild(guildId)
         val hiddenChannels = settings.getObject("hiddenChannels", mutableListOf<String>()) as MutableList<String>
-        val allChannels = allChannelsRaw 
+        val allChannels = allChannelsRaw
 
-            val guildSettings = fetchGuildSettings()
-            logger.debug("UI build: guildSettings = " + guildSettings.toString())
-            val channelOverridesArr = if (guildSettings != null) {
-                val guildObj = (guildSettings["guilds"] as? Map<*, *>)?.get(guildId.toString()) as? Map<*, *>
-                deepCopyOverrides(guildObj?.get("channel_overrides"))
-            } else mutableListOf()
-            val channelOverrides = channelOverridesArr.associateBy { it["channel_id"].toString() }
-            logger.debug("UI build: channelOverridesArr = " + channelOverridesArr.toString())
+        val guildSettings = getCurrentGuildSettings(guildId)
+        logger.debug("[getCurrentGuildSettings] raw result: $guildSettings")
+        val channelOverrides = guildSettings?.get("channel_overrides")
+        val channelOverridesMap = if (channelOverrides is Map<*, *>) {
+            channelOverrides.entries.filter { it.key is String && it.value is Int }
+                .associate { it.key as String to it.value as Int }
+        } else emptyMap<String, Int>()
+        logger.debug("[getCurrentGuildSettings] channelOverridesMap=$channelOverridesMap")
 
+        try {
+            val store = com.discord.stores.StoreStream.getUserGuildSettings()
+            com.discord.utilities.rx.ObservableExtensionsKt.appSubscribe(
+                store.observeGuildSettings(guildId),
+                ChannelBrowserPage::class.java,
+                ctx,
+                { logger.debug("[observeGuildSettings] onSubscribe") },
+                { error: com.discord.utilities.error.Error -> logger.error("[observeGuildSettings] error", error as? Exception ?: Exception(error.toString())) },
+                { logger.debug("[observeGuildSettings] onComplete") },
+                { logger.debug("[observeGuildSettings] onTerminate") },
+                { _: Any? -> logger.debug("[observeGuildSettings] Guild settings updated!") }
+            )
+        } catch (e: Throwable) {
+            logger.error("[observeGuildSettings] Exception", e)
+        }
         val typeField = com.discord.api.channel.Channel::class.java.getDeclaredField("type").apply { isAccessible = true }
         val parentIdField = com.discord.api.channel.Channel::class.java.getDeclaredField("parentId").apply { isAccessible = true }
         val idField = com.discord.api.channel.Channel::class.java.getDeclaredField("id").apply { isAccessible = true }
@@ -180,13 +216,8 @@ class ChannelBrowserPage(val settings: SettingsAPI, val channels: MutableList<St
             } ?: emptyList()
             val isCategoryHiddenLocally = catId != null && hiddenChannels.contains(catId.toString())
             val checkedCount = childIds.count { id ->
-                val override = channelOverridesArr.find { it["channel_id"].toString() == id }
-                if (override == null) {
-                    true
-                } else {
-                    val flags = (override["flags"] as? Number)?.toInt() ?: 0
-                    (flags and 4096) != 0
-                }
+                val flags = channelOverridesMap[id] ?: 4096
+                (flags and 4096) != 0
             }
             val allChecked = checkedCount == childIds.size && childIds.isNotEmpty()
             val noneChecked = checkedCount == 0
@@ -257,7 +288,10 @@ class ChannelBrowserPage(val settings: SettingsAPI, val channels: MutableList<St
             if (children != null) {
                 val isCategoryFollowed = catToggle.isChecked
                 for (ch in children) {
-                    addChannelRowReflect(ch, guildId, ctx, nameField, channelOverridesArr, linearLayout, allChannelsRaw, false, isCategoryFollowed, hiddenChannels)
+                    addChannelRowReflect(
+                        ch, guildId, ctx, nameField,
+                        channelOverridesMap, linearLayout, allChannelsRaw, false, isCategoryFollowed, hiddenChannels
+                    )
                 }
             }
         }
@@ -270,7 +304,10 @@ class ChannelBrowserPage(val settings: SettingsAPI, val channels: MutableList<St
                 setPadding(0, 24, 0, 8)
             }.let { linearLayout.addView(it) }
             for (ch in uncategorized) {
-                addChannelRowReflect(ch, guildId, ctx, nameField, channelOverridesArr, linearLayout, allChannelsRaw, false, false, hiddenChannels)
+                addChannelRowReflect(
+                    ch, guildId, ctx, nameField,
+                    channelOverridesMap, linearLayout, allChannelsRaw, false, false, hiddenChannels
+                )
             }
         }
     }
@@ -280,7 +317,7 @@ class ChannelBrowserPage(val settings: SettingsAPI, val channels: MutableList<St
         guildId: Long,
         ctx: Context,
         nameField: java.lang.reflect.Field,
-        channelOverridesArr: MutableList<MutableMap<String, Any>>,
+        channelOverridesMap: Map<String, Int>,
         linearLayout: LinearLayout,
         allChannelsRaw: Map<Long, com.discord.api.channel.Channel>,
         grayOut: Boolean = false,
@@ -297,15 +334,10 @@ class ChannelBrowserPage(val settings: SettingsAPI, val channels: MutableList<St
         } catch (_: Throwable) {
             null
         }
-            val override = channelOverridesArr.find { it["channel_id"].toString() == (chId ?: "") }
-        val isHiddenLocally = hiddenChannels.contains(chId)
-        val isHiddenInDiscord = if (override == null) {
-            false
-        } else {
-            val flags = (override["flags"] as? Number)?.toInt() ?: 0
-            (flags and 4096) == 0
-        }
-        val isChecked = !isHiddenLocally && !isHiddenInDiscord
+            val flags = if (chId != null) channelOverridesMap[chId] ?: 4096 else 4096
+            val isHiddenLocally = hiddenChannels.contains(chId)
+            val isCheckedRemote = (flags and 4096) != 0
+            val isChecked = !isHiddenLocally && isCheckedRemote
         var suppressChannelListener = BooleanArray(1) { false }
 
         val row = LinearLayout(ctx).apply {
@@ -424,5 +456,19 @@ class ChannelBrowserPage(val settings: SettingsAPI, val channels: MutableList<St
         row.addView(cb)
         row.alpha = if (!isChecked || grayOut) 0.5f else 1.0f
         linearLayout.addView(row)
+    }
+
+    fun cleanupGatewayListener() {
+        if (gatewayListener != null) {
+            try {
+                val storeGateway = Class.forName("com.discord.stores.StoreGatewayConnection").getDeclaredField("INSTANCE").get(null)
+                val removeListener = storeGateway.javaClass.getMethod("removeEventListener", String::class.java, java.util.function.BiConsumer::class.java)
+                removeListener.invoke(storeGateway, "USER_GUILD_SETTINGS_UPDATE", java.util.function.BiConsumer<String, Any?> { event, data -> gatewayListener?.invoke(event, data) })
+                logger.debug("Unregistered USER_GUILD_SETTINGS_UPDATE gateway listener")
+            } catch (e: Exception) {
+                logger.error("Failed to unregister gateway listener", e)
+            }
+            gatewayListener = null
+        }
     }
 }

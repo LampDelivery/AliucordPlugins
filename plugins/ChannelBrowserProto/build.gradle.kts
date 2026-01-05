@@ -21,7 +21,7 @@ android {
         named("main") {
             proto { }
             java {
-                srcDirs("${'$'}{protobuf.generatedFilesBaseDir}/main/javalite")
+                // srcDirs("${'$'}{protobuf.generatedFilesBaseDir}/main/javalite") // Commented out to avoid confusion with generated sources
             }
         }
     }

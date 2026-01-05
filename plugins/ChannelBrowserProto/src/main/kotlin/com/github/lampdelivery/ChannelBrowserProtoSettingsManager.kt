@@ -12,6 +12,40 @@ import com.aliucord.Utils
 
 
 class ChannelBrowserProtoSettingsManager(private val settings: SettingsAPI, private val logger: Logger) {
+        // --- Guild Settings Logic ---
+        fun patchGuildSettingsAsync(guildId: Long, channelOverrides: Map<String, Any>, onSuccess: () -> Unit = {}, onError: (String, Exception) -> Unit = { msg, e -> logger.error(msg, e) }) {
+            logger.info("patchGuildSettingsAsync: called for guild $guildId with overrides: $channelOverrides")
+            Utils.threadPool.execute {
+                try {
+                    val patchBody = mapOf(
+                        "guilds" to mapOf(
+                            guildId.toString() to mapOf(
+                                "channel_overrides" to channelOverrides
+                            )
+                        )
+                    )
+                    val req = com.aliucord.Http.Request.newDiscordRNRequest(
+                        "/users/@me/guilds/settings",
+                        "PATCH"
+                    )
+                    val resp = req.executeWithJson(patchBody)
+                    resp.assertOk()
+                    logger.info("patchGuildSettingsAsync: PATCH success for guild $guildId")
+                    onSuccess()
+                } catch (e: Exception) {
+                    logger.error("patchGuildSettingsAsync: Failed to patch guild settings", e)
+                    onError("Failed to patch guild settings: ${e.message}", e)
+                }
+            }
+        }
+
+        fun listenForGuildSettingsUpdates() {
+            logger.info("listenForGuildSettingsUpdates: registering USER_GUILD_SETTINGS_UPDATE handler")
+            GatewayAPI.onEvent("USER_GUILD_SETTINGS_UPDATE") { payload: Any? ->
+                logger.info("listenForGuildSettingsUpdates: received event payload: $payload")
+                // You may want to parse and update local state here if needed
+            }
+        }
     private val settingsSubject = BehaviorSubject.create<Settings.UserSettings>()
     @Volatile
     private var _settings: Settings.UserSettings? = null
@@ -134,10 +168,12 @@ class ChannelBrowserProtoSettingsManager(private val settings: SettingsAPI, priv
                 "GET"
             )
             val resp = req.execute()
+            logger.info("loadSettingsSync: HTTP status: ${resp.statusCode}")
             resp.assertOk()
-            logger.info("loadSettingsSync: response: ${resp.text()}")
-            val json = resp.json(Response::class.java)
-            val decoded = decodeSettings(json.settings)
+            // Removed resp.text() to avoid double reading the response body
+            val json = try { resp.json(Response::class.java) } catch (e: Exception) { logger.error("loadSettingsSync: error parsing json", e); throw e }
+            logger.info("loadSettingsSync: parsed json: $json")
+            val decoded = try { decodeSettings(json.settings) } catch (e: Exception) { logger.error("loadSettingsSync: error decoding settings", e); throw e }
             logger.info("loadSettingsSync: decoded settings: $decoded")
             decoded
         } catch (e: Exception) {
