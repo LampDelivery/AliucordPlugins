@@ -16,7 +16,6 @@ import com.aliucord.fragments.SettingsPage
 import com.discord.stores.StoreStream
 
 class ChannelBrowserPage(val settings: SettingsAPI, val channels: MutableList<String>) : SettingsPage() {
-        private var pendingCategoryPatch: Boolean = false
     private val logger = com.aliucord.Logger("ChannelBrowser")
     private val handler = android.os.Handler(android.os.Looper.getMainLooper())
     private var lastView: View? = null
@@ -111,15 +110,7 @@ class ChannelBrowserPage(val settings: SettingsAPI, val channels: MutableList<St
                 { error: com.discord.utilities.error.Error -> logger.error("[observeGuildSettings] error", error as? Exception ?: Exception(error.toString())) },
                 { logger.debug("[observeGuildSettings] onComplete") },
                 { logger.debug("[observeGuildSettings] onTerminate") },
-                { _: Any? ->
-                    logger.debug("[observeGuildSettings] Guild settings updated!")
-                    if (pendingCategoryPatch) {
-                        pendingCategoryPatch = false
-                        handler.post {
-                            lastView?.let { onViewBound(it) }
-                        }
-                    }
-                }
+                { _: Any? -> logger.debug("[observeGuildSettings] Guild settings updated!") }
             )
         } catch (e: Throwable) {
             logger.error("[observeGuildSettings] Exception", e)
@@ -220,50 +211,24 @@ class ChannelBrowserPage(val settings: SettingsAPI, val channels: MutableList<St
                     catToggle.isEnabled = false
                     Thread {
                         val newOverridesMap = mutableMapOf<String, MutableMap<String, Any>>()
-                        // Category override: preserve mute bit
-                        val catFlags = channelOverridesMap[catId.toString()] ?: 4096
-                        val catMuteBit = catFlags and 0x1
-                        val catNewFlags = if (!checked) catMuteBit else (catMuteBit or 4096)
-                        newOverridesMap[catId.toString()] = mutableMapOf("channel_id" to catId.toString(), "flags" to catNewFlags)
+                        newOverridesMap[catId.toString()] = mutableMapOf("channel_id" to catId.toString(), "flags" to if (checked) 4096 else 0)
                         val localHidden = settings.getObject("hiddenChannels", mutableListOf<String>()) as MutableList<String>
                         val prevHiddenKey = "catPrevHidden_${catId.toString()}"
-                        val prevMuteKey = "catPrevMute_${catId.toString()}"
-                        if (!checked) {
+                        if (checked) {
                             val prevHidden = childIds.filter { localHidden.contains(it) }
-                            val prevMuted = childIds.filter { id -> (channelOverridesMap[id] ?: 0) and 0x1 != 0 }
                             settings.setObject(prevHiddenKey, prevHidden)
-                            settings.setObject(prevMuteKey, prevMuted)
                             for (chId in childIds) {
                                 localHidden.remove(chId)
-                                // Unmute and unhide: clear mute and hidden bits
-                                val origFlags = channelOverridesMap[chId] ?: 4096
-                                val newFlags = origFlags and (4096.inv()) and (0x1.inv())
-                                newOverridesMap[chId] = mutableMapOf(
-                                    "channel_id" to chId,
-                                    "flags" to newFlags,
-                                    "muted" to false
-                                )
                             }
                             localHidden.remove(catId.toString())
                         } else {
                             val prevHidden = settings.getObject(prevHiddenKey, mutableListOf<String>()) as MutableList<String>
-                            val prevMuted = settings.getObject(prevMuteKey, mutableListOf<String>()) as MutableList<String>
                             for (chId in childIds) {
                                 if (prevHidden.contains(chId)) {
                                     if (!localHidden.contains(chId)) localHidden.add(chId)
                                 } else {
                                     localHidden.remove(chId)
                                 }
-                                // Restore mute if it was previously muted, and hide
-                                val origFlags = channelOverridesMap[chId] ?: 4096
-                                var newFlags = origFlags or 4096 // set hidden bit
-                                val wasMuted = prevMuted.contains(chId)
-                                if (wasMuted) newFlags = newFlags or 0x1 else newFlags = newFlags and (0x1.inv())
-                                newOverridesMap[chId] = mutableMapOf(
-                                    "channel_id" to chId,
-                                    "flags" to newFlags,
-                                    "muted" to wasMuted
-                                )
                             }
                             if (!localHidden.contains(catId.toString())) localHidden.add(catId.toString())
                         }
@@ -275,21 +240,22 @@ class ChannelBrowserPage(val settings: SettingsAPI, val channels: MutableList<St
                                 )
                             )
                         )
-                        logger.info("[ChannelBrowser] PATCH body: $patchBody")
                         try {
+                            logger.debug("PATCH (category) body: $patchBody")
                             val req = com.aliucord.Http.Request.newDiscordRNRequest(
                                 "/users/@me/guilds/settings",
                                 "PATCH"
                             )
                             val resp = req.executeWithJson(patchBody)
-                            logger.info("[ChannelBrowser] PATCH response: ${resp.text()}")
+                            logger.debug("PATCH (category) response: ${resp.text()}")
                         } catch (e: Exception) {
                             logger.error("PATCH (category) error", e)
                         }
-                            logger.info("[ChannelBrowser] channelOverridesMap after backend update: $channelOverridesMap")
-                        pendingCategoryPatch = true
-                        handler.post {
-                            catToggle.isEnabled = true
+                        lastView?.let { v ->
+                            handler.post {
+                                catToggle.isEnabled = true
+                                onViewBound(v)
+                            }
                         }
                     }.start()
                 }
