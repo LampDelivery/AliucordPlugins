@@ -65,7 +65,9 @@ class CustomTimestamp : Plugin() {
                 "MMM dd, yyyy HH:mm", "dd MMM yyyy HH:mm", "MM/dd/yyyy HH:mm", "dd-MM-yyyy HH:mm", "yyyy/MM/dd HH:mm",
                 "yyyy-MM-dd HH:mm",
                 "MMM dd, yyyy hh:mm a", "dd MMM yyyy hh:mm a", "MM/dd/yyyy hh:mm a", "dd-MM-yyyy hh:mm a", "yyyy/MM/dd hh:mm a",
-                "yyyy-MM-dd hh:mm a"
+                "yyyy-MM-dd hh:mm a",
+                "dd/MM/yyyy HH:mm", "dd/MM/yy HH:mm",
+                "dd/MM/yyyy hh:mm a", "dd/MM/yy hh:mm a"
             )
             var reformatted = false
 

@@ -17,7 +17,7 @@ subprojects {
     }
 
     configure<LibraryExtension> {
-        namespace = "com.github.ushie"
+        namespace = "com.github.lampdelivery"
         compileSdk = 36
 
         defaultConfig {
@@ -38,7 +38,7 @@ subprojects {
     }
 
     configure<AliucordExtension> {
-        author("LampDelivery", 399862294143696897L, hyperlink = true)
+        author("LampDelivery", 650805815623680030L, hyperlink = true)
 
         github("https://github.com/LampDelivery/AliucordPlugins")
     }

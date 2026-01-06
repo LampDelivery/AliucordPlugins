@@ -37,23 +37,27 @@ class CustomTimestampSettings(private val settings: SettingsAPI) : SettingsPage(
         val todayReplacement = settings.getString("todayReplacement", "")
         val formatOptions = listOf(
             "MMM dd, yyyy",         // Mon DD, YYYY (Default)
-            "yyyy-MM-dd",           // YYYY-MM-DD (Numerical)
-            "yyyy/MM/dd",           // YYYY/MM/DD
-            "dd-MM-yyyy",           // DD-MM-YYYY
-            "yy/MM/dd",             // YY/MM/DD (two-digit year)
             "dd-MM-yy",             // DD-MM-YY (two-digit year)
+            "dd-MM-yyyy",           // DD-MM-YYYY
+            "dd MMM yyyy",          // DD Mon YYYY
+            "dd/MM/yy",             // DD/MM/YY
+            "dd/MM/yyyy",           // DD/MM/YYYY
             "MM/dd/yyyy",           // MM/DD/YYYY
-            "dd MMM yyyy"           // DD Mon YYYY
+            "yy/MM/dd",             // YY/MM/DD (two-digit year)
+            "yyyy-MM-dd",           // YYYY-MM-DD (Numerical)
+            "yyyy/MM/dd"            // YYYY/MM/DD
         )
         val formatLabels = listOf(
             "Mon DD, YYYY (Default)",
-            "YYYY-MM-DD (Numerical)",
-            "YYYY/MM/DD",
+            "DD-MM-YY",
             "DD-MM-YYYY",
-            "YY/MM/DD (two-digit year)",
-            "DD-MM-YY (two-digit year)",
+            "DD Mon YYYY",
+            "DD/MM/YY",
+            "DD/MM/YYYY",
             "MM/DD/YYYY",
-            "DD Mon YYYY"
+            "YY/MM/DD",
+            "YYYY-MM-DD",
+            "YYYY/MM/DD"
         )
         val defaultFormat = "MMM dd, yyyy"
         val currentFormat = settings.getString("customDateFormat", defaultFormat)
