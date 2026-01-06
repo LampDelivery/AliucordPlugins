@@ -5,7 +5,7 @@ import com.aliucord.Http
 import android.view.Gravity
 import android.view.View
 import android.content.Context
-impoww android.widget.*
+import android.widget.*
 import androidx.appcompat.app.AlertDialog
 import androidx.core.content.res.ResourcesCompat
 import androidx.core.content.ContextCompat
@@ -85,13 +85,14 @@ class ChannelBrowserPage(val settings: SettingsAPI) : SettingsPage() {
                 store.observeGuildSettings(guildId),
                 ChannelBrowserPage::class.java,
                 ctx,
-                {},
-                { _: com.discord.utilities.error.Error -> },
-                {},
-                {},
-                { _: Any? -> }
+                { /* logger removed */ },
+                { _: com.discord.utilities.error.Error -> /* logger removed */ },
+                { /* logger removed */ },
+                { /* logger removed */ },
+                { _: Any? -> /* logger removed */ }
             )
-        } catch (_: Throwable) {
+        } catch (e: Throwable) {
+            logger.error("[observeGuildSettings] Exception", e)
         }
         val typeField =
             com.discord.api.channel.Channel::class.java.getDeclaredField("type").apply { isAccessible = true }
@@ -227,11 +228,19 @@ class ChannelBrowserPage(val settings: SettingsAPI) : SettingsPage() {
                         settings.setObject("hiddenChannels", localHidden)
                         val syncToPC = settings.getBool("syncToPC", true)
                         if (syncToPC) {
+                            val patchBody = mapOf(
+                                "guilds" to mapOf(
+                                    guildId.toString() to mapOf(
+                                        "channel_overrides" to newOverridesMap
+                                    )
+                                )
+                            )
                             try {
                                 val req = Http.Request.newDiscordRNRequest(
                                     "/users/@me/guilds/settings",
                                     "PATCH"
                                 )
+                                val resp = req.executeWithJson(patchBody)
                             } catch (_: Exception) {
                             }
                         }
@@ -379,7 +388,19 @@ class ChannelBrowserPage(val settings: SettingsAPI) : SettingsPage() {
                         }
                         settings.setObject("hiddenChannels", hiddenChannels)
                         if (settings.getBool("syncToPC", true)) {
+                            val patchBody = mapOf(
+                                "guilds" to mapOf(
+                                    guildId.toString() to mapOf(
+                                        "channel_overrides" to channelOverrides
+                                    )
+                                )
+                            )
                             try {
+                                val req = Http.Request.newDiscordRNRequest(
+                                    "/users/@me/guilds/settings",
+                                    "PATCH"
+                                )
+                                val resp = req.executeWithJson(patchBody)
                             } catch (_: Exception) {
                             }
                         }
