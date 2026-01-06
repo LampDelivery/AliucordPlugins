@@ -85,11 +85,11 @@ class ChannelBrowserPage(val settings: SettingsAPI) : SettingsPage() {
                 store.observeGuildSettings(guildId),
                 ChannelBrowserPage::class.java,
                 ctx,
-                { /* logger removed */ },
-                { _: com.discord.utilities.error.Error -> /* logger removed */ },
-                { /* logger removed */ },
-                { /* logger removed */ },
-                { _: Any? -> /* logger removed */ }
+                { /*  */ },
+                { _: com.discord.utilities.error.Error -> /*  */ },
+                { /*  */ },
+                { /*  */ },
+                { _: Any? -> /*  */ }
             )
         } catch (e: Throwable) {
             logger.error("[observeGuildSettings] Exception", e)
