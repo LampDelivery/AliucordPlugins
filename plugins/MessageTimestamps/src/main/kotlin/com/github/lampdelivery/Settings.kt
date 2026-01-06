@@ -34,6 +34,8 @@ class CustomTimestampSettings(private val settings: SettingsAPI) : SettingsPage(
 
     override fun onViewBound(view: View) {
         super.onViewBound(view)
+        setActionBarTitle("Message Timestamps Settings")
+        setActionBarSubtitle(null)
         val todayReplacement = settings.getString("todayReplacement", "")
         val formatOptions = listOf(
             "MMM dd, yyyy",         // Mon DD, YYYY (Default)
