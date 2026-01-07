@@ -4,6 +4,8 @@ import android.annotation.SuppressLint
 import android.content.Context
 import android.os.Bundle
 import android.view.LayoutInflater
+import android.view.View
+import android.view.ViewGroup
 import com.aliucord.annotations.AliucordPlugin
 import com.aliucord.entities.Plugin
 import com.aliucord.patcher.Hook
@@ -19,11 +21,50 @@ class CustomNameFormat : Plugin() {
     enum class Format {
         NICKNAME_USERNAME,
         NICKNAME_TAG,
-        DISPLAYNAME_USERNAME,
-        DISPLAYNAME_TAG,
         USERNAME,
         USERNAME_NICKNAME,
+        DISPLAYNAME_USERNAME,
+        DISPLAYNAME_TAG,
         USERNAME_DISPLAYNAME
+    }
+
+    init {
+        settingsTab = SettingsTab(PluginSettings::class.java, SettingsTab.Type.BOTTOM_SHEET).withArgs(settings)
+    }
+
+    class PluginSettings(private val settings: com.aliucord.api.SettingsAPI) : com.discord.app.AppBottomSheet() {
+        override fun getContentViewResId(): Int = 0
+
+        @SuppressLint("SetTextI18n")
+        override fun onCreateView(inflater: LayoutInflater, container: ViewGroup?, savedInstanceState: Bundle?): View? {
+            val context = inflater.context
+            val layout = com.aliucord.widgets.LinearLayout(context)
+            layout.setBackgroundColor(com.discord.utilities.color.ColorCompat.getThemedColor(context, com.lytefast.flexinput.R.b.colorBackgroundPrimary))
+
+            val radios = listOf(
+                com.aliucord.Utils.createCheckedSetting(context, com.discord.views.CheckedSetting.ViewType.RADIO, "Nickname (Username)", null),
+                com.aliucord.Utils.createCheckedSetting(context, com.discord.views.CheckedSetting.ViewType.RADIO, "Nickname (Tag)", null),
+                com.aliucord.Utils.createCheckedSetting(context, com.discord.views.CheckedSetting.ViewType.RADIO, "Username", null),
+                com.aliucord.Utils.createCheckedSetting(context, com.discord.views.CheckedSetting.ViewType.RADIO, "Username (Nickname)", null),
+                com.aliucord.Utils.createCheckedSetting(context, com.discord.views.CheckedSetting.ViewType.RADIO, "Display Name (Username)", null),
+                com.aliucord.Utils.createCheckedSetting(context, com.discord.views.CheckedSetting.ViewType.RADIO, "Display Name (Tag)", null),
+                com.aliucord.Utils.createCheckedSetting(context, com.discord.views.CheckedSetting.ViewType.RADIO, "Username (Display Name)", null)
+            )
+
+            val radioManager = com.discord.views.RadioManager(radios)
+            var format = Format.valueOf(settings.getString("format", Format.NICKNAME_USERNAME.name))
+
+            for ((i, radio) in radios.withIndex()) {
+                radio.e {
+                    settings.setString("format", Format.values()[i].name)
+                    radioManager.a(radio)
+                }
+                layout.addView(radio)
+                if (i == format.ordinal) radioManager.a(radio)
+            }
+
+            return layout
+        }
     }
 
     override fun start(context: Context) {
@@ -32,18 +73,10 @@ class CustomNameFormat : Plugin() {
             GuildMember::class.java.getDeclaredMethod("getNickOrUsername", User::class.java, GuildMember::class.java, Channel::class.java, List::class.java),
             Hook { param ->
                 val user = param.args[0] as User
-                val member = param.args[1] as? GuildMember
-                val nickname = member?.nick
-                val displayName = try {
-                    user.javaClass.getMethod("getGlobalName").invoke(user) as? String ?: user.username
-                } catch (_: Throwable) {
-                    user.username
-                }
                 val username = user.username
                 val res = param.result as String
-                if (res == username) {
-                    param.result = getFormatted(nickname, displayName, username, res, user)
-                }
+                if (res == username) return@Hook
+                param.result = getFormatted(username, res, user)
             }
         )
 
@@ -131,15 +164,16 @@ class CustomNameFormat : Plugin() {
         patcher.unpatchAll()
     }
 
-    private fun getFormatted(nickname: String?, displayName: String, username: String, res: String, user: User): String {
+    private fun getFormatted(username: String, res: String, user: User): String {
+        val displayName = user.globalName ?: username
         val format = Format.valueOf(settings.getString("format", Format.NICKNAME_USERNAME.name))
         return when (format) {
-            Format.NICKNAME_USERNAME -> "${nickname ?: displayName} ($username)"
-            Format.NICKNAME_TAG -> "${nickname ?: displayName} ($username${UserUtils.INSTANCE.getDiscriminatorWithPadding(user)})"
+            Format.NICKNAME_USERNAME -> "$res ($username)"
+            Format.NICKNAME_TAG -> "$res ($username${UserUtils.INSTANCE.getDiscriminatorWithPadding(user)})"
+            Format.USERNAME -> username
+            Format.USERNAME_NICKNAME -> "$username ($res)"
             Format.DISPLAYNAME_USERNAME -> "$displayName ($username)"
             Format.DISPLAYNAME_TAG -> "$displayName ($username${UserUtils.INSTANCE.getDiscriminatorWithPadding(user)})"
-            Format.USERNAME -> username
-            Format.USERNAME_NICKNAME -> "$username (${nickname ?: displayName})"
             Format.USERNAME_DISPLAYNAME -> "$username ($displayName)"
         }
     }
