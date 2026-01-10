@@ -321,8 +321,6 @@ internal class ChannelBrowserPage(val settings: SettingsAPI) : SettingsPage() {
             try {
                 val iconRes = when (type) {
                     2 -> R.e.ic_channel_voice 
-                    5 -> try { R.e.ic_channel_announcement } catch (_: Throwable) { R.e.ic_channel_text } 
-                    13 -> try { R.e.ic_channel_rules } catch (_: Throwable) { R.e.ic_channel_text } 
                     else -> R.e.ic_channel_text 
                 }
                 val drawable = ctx.getDrawable(iconRes)?.mutate()
