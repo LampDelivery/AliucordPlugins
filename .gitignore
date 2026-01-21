@@ -17,3 +17,6 @@ plugins/ChannelBrowser/src/main/proto/
 # System
 .DS_Store
 Thumbs.db
+
+# Aliucord Discord internals and plugin sources
+external/
