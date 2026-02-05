@@ -20,12 +20,4 @@ Planning to merge into core, which is why I am not releasing it as a normal plug
 As of writing this it only syncs changes from one direction (Aliucord -> PC/RN), so beware.
 
 ## DebugLogEnhancer
-Replaces discord debug logs with a new page that supports filtering and searching
-
-
-
-
-
-
-
-
+Replaces discord debug logs with a new page that supports filters, search and more
