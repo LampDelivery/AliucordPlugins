@@ -19,6 +19,8 @@ Manage your channel list from a menu sheet, show/hide channels and follow/unfoll
 Planning to merge into core, which is why I am not releasing it as a normal plugin
 As of writing this it only syncs changes from one direction (Aliucord -> PC/RN), so beware.
 
+## DebugLogEnhancer
+Replaces discord's pesky debug logs with a new page that supports filters and searching
 
 
 
