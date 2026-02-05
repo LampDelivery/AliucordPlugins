@@ -2,21 +2,22 @@
 
 hi
 
-## MessageLinkCompact
-Compacts message links in dms and servers like DiscordRN
+## CompactLinks
+Compacts links like DiscordRN **(MoreHighlight is required until its core)**
 
-Required: install MoreHighlight for hyperlinks until it becomes core (temporary)
+## CopyLinks
+Copy channel links from the context menu
 
 ## AtPrefixProfiles
-Adds @ as a prefix to profiles
+Adds an @ as a prefix to usernames in profiles (also the settings)
 
 ## MessageTimestamps
 Configure the message timestamps
 
-This plugin was renamed since it does something fundamentally different from CustomTimestamps, I just named it similar by accident (oops)
-
 ## ChannelBrowser (BETA)
 Manage your channel list from a menu sheet, show/hide channels and follow/unfollow categories
+Planning to merge into core, which is why I am not releasing it as a normal plugin
+As of writing this it only syncs changes from one direction (Aliucord -> PC/RN), so beware.
 
 
 
