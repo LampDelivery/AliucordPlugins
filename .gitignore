@@ -8,7 +8,7 @@
 
 # Protobuf definitions (ChannelBrowser plugin)
 plugins/ChannelBrowser/src/main/proto/
-
+plugins/Themer/
 # Editor
 /.vscode/
 /.idea/
