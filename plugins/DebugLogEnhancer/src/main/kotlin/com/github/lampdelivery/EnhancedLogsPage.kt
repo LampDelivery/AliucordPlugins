@@ -7,6 +7,7 @@ import android.text.TextWatcher
 import android.view.Gravity
 import android.view.View
 import android.widget.TextView
+import android.view.ViewGroup
 import androidx.recyclerview.widget.DividerItemDecoration
 import androidx.recyclerview.widget.LinearLayoutManager
 import androidx.recyclerview.widget.RecyclerView
@@ -101,7 +102,7 @@ class EnhancedLogsPage(private val settings: com.aliucord.api.SettingsAPI) : Set
         layoutManager.stackFromEnd = true
         recyclerView.layoutManager = layoutManager
         recyclerView.setPadding(0, padding, 0, 0)
-        adapter = LogsAdapter(logs, useCardBg = true, onLogAction = { logText, action ->
+        adapter = LogsAdapter(logs, onLogAction = { logText, action ->
             when (action) {
                 "copy" -> {
                     val clipboard = safeContext.getSystemService(Context.CLIPBOARD_SERVICE) as android.content.ClipboardManager
@@ -149,12 +150,6 @@ class EnhancedLogsPage(private val settings: com.aliucord.api.SettingsAPI) : Set
             }
         })
         recyclerView.adapter = adapter
-        val shapeDrawable = android.graphics.drawable.ShapeDrawable(android.graphics.drawable.shapes.RectShape())
-        shapeDrawable.paint.color = Color.TRANSPARENT
-        shapeDrawable.intrinsicHeight = padding
-        val decoration = DividerItemDecoration(safeContext, DividerItemDecoration.VERTICAL)
-        decoration.setDrawable(shapeDrawable)
-        recyclerView.addItemDecoration(decoration)
         recyclerView.layoutParams = LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, 0, 1f)
         addView(recyclerView)
 
@@ -259,9 +254,13 @@ class EnhancedLogsPage(private val settings: com.aliucord.api.SettingsAPI) : Set
 
 class LogsAdapter(
     logs: List<Any>,
-    private val useCardBg: Boolean = false,
     private val onLogAction: ((logText: String, action: String) -> Unit)? = null
 ) : RecyclerView.Adapter<LogsAdapter.VH>() {
+    private var useCardBg: Boolean = true
+    fun setUseCardBg(enabled: Boolean) {
+        useCardBg = enabled
+        notifyDataSetChanged()
+    }
     private var full: List<Any> = logs
     private var filtered: List<Any> = logs
 
@@ -300,7 +299,8 @@ class LogsAdapter(
             } catch (_: Throwable) {}
             textSize = 15f
         }
-        return VH(tv)
+        val card = CardUtils.wrapInMaterialCard(ctx, tv)
+        return VH(tv, card)
     }
 
     override fun getItemCount(): Int = filtered.size
@@ -322,21 +322,54 @@ class LogsAdapter(
                 5 -> com.discord.utilities.color.ColorCompat.getThemedColor(ctx, com.lytefast.flexinput.R.b.colorStatusDanger)
                 4 -> com.discord.utilities.color.ColorCompat.getThemedColor(ctx, com.lytefast.flexinput.R.b.colorStatusWarning)
                 3 -> com.discord.utilities.color.ColorCompat.getThemedColor(ctx, com.lytefast.flexinput.R.b.colorInteractiveNormal)
-                2 -> com.discord.utilities.color.ColorCompat.getThemedColor(ctx, com.lytefast.flexinput.R.b.colorInteractiveMuted)
+                2 -> Color.WHITE 
                 else -> com.discord.utilities.color.ColorCompat.getThemedColor(ctx, com.lytefast.flexinput.R.b.colorInteractiveNormal)
             }
         } catch (_: Throwable) {
             Color.WHITE
         }
         holder.tv.setTextColor(color)
-        if (useCardBg) {
-            val bg = android.graphics.drawable.GradientDrawable()
-            bg.cornerRadius = 12f * ctx.resources.displayMetrics.density
-            bg.setColor(com.discord.utilities.color.ColorCompat.getThemedColor(ctx, com.lytefast.flexinput.R.b.colorBackgroundSecondary))
-            holder.tv.background = bg
-            val pad = (8 * ctx.resources.displayMetrics.density).toInt()
-            holder.tv.setPadding(pad, pad, pad, pad)
+        if (useCardBg && holder.card is com.google.android.material.card.MaterialCardView) {
+            val card = holder.card as com.google.android.material.card.MaterialCardView
+            val density = ctx.resources.displayMetrics.density
+            val padding = (12 * density).toInt()
+            val bigCorner = 24f * density
+            val smallCorner = 0f 
+            val outerMargin = (4 * density).toInt() 
+            val groupMargin = 0 
+            val crocosmiaPad = (12 * density).toInt()
+            card.setContentPadding(crocosmiaPad, crocosmiaPad, crocosmiaPad, crocosmiaPad)
+            card.cardElevation = 0f
+            card.maxCardElevation = 0f
+            card.preventCornerOverlap = false
+            card.useCompatPadding = false
+            card.setContentPadding(crocosmiaPad, crocosmiaPad, crocosmiaPad, crocosmiaPad)
+            card.minimumHeight = 0
+            val isFirst = position == 0
+            val isLast = position == filtered.lastIndex
+            val shape = card.shapeAppearanceModel.toBuilder()
+            shape.setAllCorners(com.google.android.material.shape.CornerFamily.ROUNDED, smallCorner)
+            if (isFirst) {
+                shape.setBottomLeftCornerSize(bigCorner)
+                shape.setBottomRightCornerSize(bigCorner)
+            }
+            if (isLast) {
+                shape.setTopLeftCornerSize(bigCorner)
+                shape.setTopRightCornerSize(bigCorner)
+            }
+            card.shapeAppearanceModel = shape.build()
+            card.clipToOutline = true
+            val params = card.layoutParams
+            if (params is ViewGroup.MarginLayoutParams) {
+                val gap = (1 * density).toInt()
+                params.topMargin = if (isFirst) 0 else gap
+                params.bottomMargin = 0
+                params.leftMargin = 0
+                params.rightMargin = 0
+                card.layoutParams = params
+            }
         }
+
         holder.tv.setOnLongClickListener {
             val actions = arrayOf("Copy", "Share", "Details")
             val icons = arrayOf(
@@ -409,7 +442,7 @@ class LogsAdapter(
         }
     }
 
-    class VH(val tv: TextView) : RecyclerView.ViewHolder(tv)
+    class VH(val tv: TextView, val card: View) : RecyclerView.ViewHolder(card)
 
     companion object {
         fun getMessage(item: Any): String {
