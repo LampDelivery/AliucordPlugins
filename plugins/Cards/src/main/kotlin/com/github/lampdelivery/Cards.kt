@@ -195,7 +195,7 @@ class ContextMenuCard : Plugin() {
                         }
                         if (group.isNotEmpty()) CardUtils.wrapSettingsCategoryCards(group, logger)
                     }
-                }, 350L) 
+                })
             })
         } catch (e: Throwable) {
             logger.error("ContextMenuCard: Failed to patch settings page", e)
