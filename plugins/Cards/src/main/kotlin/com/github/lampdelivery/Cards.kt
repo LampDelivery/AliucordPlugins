@@ -45,7 +45,7 @@ class ContextMenuCard : Plugin() {
                     }
                     .firstOrNull()
                 if (containerField != null) {
-                    containerField.postDelayed({ doWrap() }, 150L)
+                    containerField.post({ doWrap() })
                 } else {
                     doWrap()
                 }
@@ -68,7 +68,7 @@ class ContextMenuCard : Plugin() {
                     logger.warn("[ContextMenuCard] Message: getView() is not a ViewGroup!")
                     return@patch
                 }
-                rootView.postDelayed({ CardUtils.wrapActionItemsInCards(rootView, logger) }, 150L)
+                rootView.post { CardUtils.wrapActionItemsInCards(rootView, logger) }
             })
         } catch (e: Throwable) {
             logger.error("ContextMenuCard: Failed to patch message context menu", e)
@@ -79,7 +79,7 @@ class ContextMenuCard : Plugin() {
             val onViewBoundMethod = settingsClass.getDeclaredMethod("onViewBound", View::class.java)
             patcher.patch(onViewBoundMethod, { param ->
                 val root = param.args[0] as? ViewGroup ?: return@patch
-                root.postDelayed({
+                root.post({
                     val headerViews = mutableListOf<View>()
                     fun findHeaders(view: View) {
                         if (view is android.widget.TextView && view.text?.toString()?.contains("Settings", true) == true) {
